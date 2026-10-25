@@ -1,0 +1,12 @@
+# Archivos que no deben subirse junto con el modulo/configuracion cuando Terraform empaqueta
+# el directorio (ej. al publicar un modulo o al usar Terraform Cloud/Enterprise).
+.git/
+.github/
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+docs/
+specs/
+*.md

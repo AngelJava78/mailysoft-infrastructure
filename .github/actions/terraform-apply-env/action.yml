@@ -1,0 +1,46 @@
+name: "Terraform apply (un entorno)"
+description: "init -> apply para environments/<environment>, usado por terraform-apply.yml"
+
+inputs:
+  environment:
+    required: true
+    description: "dev, staging o production"
+  azure-client-id:
+    required: true
+  azure-tenant-id:
+    required: true
+  azure-subscription-id:
+    required: true
+  railway-token:
+    required: true
+  tf-version:
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.tf-version }}
+
+    - uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.azure-client-id }}
+        tenant-id: ${{ inputs.azure-tenant-id }}
+        subscription-id: ${{ inputs.azure-subscription-id }}
+
+    - name: terraform init
+      working-directory: environments/${{ inputs.environment }}
+      shell: bash
+      run: terraform init -input=false
+
+    - name: terraform apply
+      working-directory: environments/${{ inputs.environment }}
+      shell: bash
+      env:
+        RAILWAY_TOKEN: ${{ inputs.railway-token }}
+      run: |
+        terraform apply -input=false -auto-approve -no-color \
+          -var-file="environment.tfvars" \
+          -var-file="database.tfvars" \
+          -var-file="services.tfvars"

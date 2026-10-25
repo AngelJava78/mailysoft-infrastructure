@@ -1,0 +1,20 @@
+# EJEMPLO (no se carga automaticamente): demuestra FR-012 / T047 del plan de implementacion
+# — anadir una API nueva requiere SOLO esto: una entrada mas en la lista `services` de
+# services.tfvars, copiada tal cual a continuacion. Ningun archivo bajo modules/ cambia.
+#
+# Para probarlo de verdad: copiar este bloque dentro del array `services` de
+# services.tfvars, abrir un PR, y confirmar en terraform-pr.yml que el plan solo muestra
+# la creacion de "mailysoft-ejemplo-api-dev", sin ninguna modificacion sobre los 4 servicios
+# ya existentes (T048). Luego revertir el cambio (T049).
+
+{
+  name              = "mailysoft-ejemplo-api-dev"
+  enabled           = true
+  provider          = "railway"
+  servicio_tag      = "ejemplo-api"
+  propietario_tag   = "equipo-plataforma"
+  source_repo       = "github.com/mailysoft/mailysoft-ejemplo-api"
+  source_ref        = "main"
+  domain_type       = "private"
+  requires_database = false
+}

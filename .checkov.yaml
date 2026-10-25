@@ -1,0 +1,23 @@
+# Linea base de analisis de seguridad para Terraform (Principio V de la constitucion:
+# fmt -> validate -> lint -> security-scan -> plan -> revision -> apply).
+# Ver research.md Fase 001-railway-deployment, seccion 8.
+
+framework:
+  - terraform
+
+directory:
+  - .
+
+download-external-modules: false
+
+# bootstrap/ usa estado local de un solo uso (excepcion documentada al Principio III); se
+# analiza igual que el resto, sin reglas distintas.
+skip-path:
+  - .terraform
+  - specs
+
+# Las reglas de severidad CRITICAL/HIGH no se omiten; cualquier excepcion puntual debe
+# documentarse en linea con un comentario `#checkov:skip=<CHECK_ID>:<motivo>` y justificarse
+# en el PR correspondiente (Principio VIII: cambios y excepciones documentados).
+soft-fail: false
+compact: true
