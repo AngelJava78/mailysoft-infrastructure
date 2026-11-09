@@ -15,12 +15,31 @@ variable "enabled" {
 
 variable "provider_name" {
   type        = string
-  description = "Proveedor de destino: railway (operativo en esta fase), azure o aws (reservados, ver FR-005). Corresponde al campo 'provider' de data-model.md; se renombra aqui porque 'provider' es una palabra reservada en Terraform."
+  description = "Proveedor de destino: railway o azure (operativos desde 002-single-provider-deployment) o aws (reservado, ver FR-005 de 001-railway-deployment). Corresponde al campo 'provider' de data-model.md; se renombra aqui porque 'provider' es una palabra reservada en Terraform."
 
   validation {
     condition     = contains(["railway", "azure", "aws"], var.provider_name)
     error_message = "provider_name debe ser uno de: railway, azure, aws (Principio II: orden Railway -> Azure -> AWS)."
   }
+}
+
+variable "container_image" {
+  type        = string
+  description = "Solo para provider_name = azure (modules/service/azure): referencia a la imagen de contenedor ya construida. Si se omite, se deriva de source_repo/source_ref. Sin efecto en railway (que construye nativamente desde source_repo)."
+  default     = ""
+}
+
+variable "azure_network" {
+  type = object({
+    resource_group_name           = string
+    location                       = string
+    subnet_id_web                  = string
+    subnet_id_apis                 = string
+    container_apps_environment_id  = string
+  })
+  description = "Solo para provider_name = azure: salida compute_network_refs de modules/network-domain/azure (002-single-provider-deployment). Obligatorio cuando provider_name = azure; sin efecto en los demas proveedores."
+  default     = null
+  nullable    = true
 }
 
 variable "railway_project_id" {

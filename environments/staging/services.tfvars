@@ -47,13 +47,45 @@ services = [
     requires_database = false
   },
   {
+    # 002-single-provider-deployment (FR-009): habilitada, mismo motivo que en dev.
     name              = "mailysoft-web-staging"
-    enabled           = false
+    enabled           = true
     provider          = "railway"
     servicio_tag      = "web"
     propietario_tag   = "equipo-plataforma"
-    source_repo       = ""
+    source_repo       = "github.com/mailysoft/mailysoft-web"
+    source_ref        = "main"
     domain_type       = "public"
     requires_database = false
+  },
+  {
+    name              = "mailysoft-clinicas-api-staging"
+    enabled           = true
+    provider          = "railway"
+    servicio_tag      = "clinicas-api"
+    propietario_tag   = "equipo-plataforma"
+    source_repo       = "github.com/mailysoft/mailysoft-clinicas-api"
+    source_ref        = "main"
+    requires_database = true
+  },
+  {
+    name              = "mailysoft-agenda-api-staging"
+    enabled           = true
+    provider          = "railway"
+    servicio_tag      = "agenda-api"
+    propietario_tag   = "equipo-plataforma"
+    source_repo       = "github.com/mailysoft/mailysoft-agenda-api"
+    source_ref        = "main"
+    requires_database = true
+  },
+  {
+    name              = "mailysoft-publica-api-staging"
+    enabled           = true
+    provider          = "railway"
+    servicio_tag      = "publica-api"
+    propietario_tag   = "equipo-plataforma"
+    source_repo       = "github.com/mailysoft/mailysoft-publica-api"
+    source_ref        = "main"
+    requires_database = true
   },
 ]

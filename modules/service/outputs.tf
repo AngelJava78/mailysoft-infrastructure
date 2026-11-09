@@ -14,6 +14,6 @@ output "internal_address" {
 }
 
 output "provider_available" {
-  value       = var.provider_name == "railway"
-  description = "false si el proveedor seleccionado aun no esta operativo en esta fase (FR-005)."
+  value       = contains(["railway", "azure"], var.provider_name)
+  description = "false si el proveedor seleccionado aun no esta operativo (FR-005 de 001-railway-deployment); railway y azure estan operativos desde 002-single-provider-deployment (FR-002), aws sigue sin estarlo."
 }

@@ -1,0 +1,66 @@
+name: "Terraform check provider mix (un entorno)"
+description: "Genera un plan de solo lectura y expone si FR-014 (002-single-provider-deployment) detecta mezcla de proveedores, para decidir si ese entorno necesita el gate manual de manual-review antes de aplicar."
+
+inputs:
+  environment:
+    required: true
+    description: "dev o staging (production ya exige aprobacion manual para todo cambio, FR-009)"
+  azure-client-id:
+    required: true
+  azure-tenant-id:
+    required: true
+  azure-subscription-id:
+    required: true
+  railway-token:
+    required: true
+  tf-version:
+    required: true
+
+outputs:
+  requires_review:
+    description: "'true' si el plan de este entorno tiene cambios destructivos o la advertencia de mezcla de proveedores (FR-010/FR-014)."
+    value: ${{ steps.check.outputs.requires_review }}
+
+runs:
+  using: "composite"
+  steps:
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.tf-version }}
+
+    - uses: azure/login@v2
+      with:
+        client-id: ${{ inputs.azure-client-id }}
+        tenant-id: ${{ inputs.azure-tenant-id }}
+        subscription-id: ${{ inputs.azure-subscription-id }}
+
+    - name: terraform init
+      working-directory: environments/${{ inputs.environment }}
+      shell: bash
+      run: terraform init -input=false
+
+    - name: terraform plan (solo lectura)
+      working-directory: environments/${{ inputs.environment }}
+      shell: bash
+      env:
+        RAILWAY_TOKEN: ${{ inputs.railway-token }}
+      run: |
+        terraform plan -input=false -no-color -lock=false \
+          -var-file="environment.tfvars" \
+          -var-file="database.tfvars" \
+          -var-file="services.tfvars" \
+          -out=check.tfplan
+        terraform show -json check.tfplan > check.plan.json
+
+    - name: Evaluar FR-010 / FR-014
+      id: check
+      working-directory: environments/${{ inputs.environment }}
+      shell: bash
+      run: |
+        HAS_DESTRUCTIVE=$(jq -r '[.resource_changes[]? | select(.change.actions | contains(["delete"]))] | length > 0' check.plan.json)
+        HAS_PROVIDER_MIX=$(jq -r '[.checks[]? | select(.status == "fail")] | length > 0' check.plan.json)
+        if [ "$HAS_DESTRUCTIVE" = "true" ] || [ "$HAS_PROVIDER_MIX" = "true" ]; then
+          echo "requires_review=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "requires_review=false" >> "$GITHUB_OUTPUT"
+        fi

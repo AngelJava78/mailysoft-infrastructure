@@ -4,8 +4,10 @@ Infraestructura como código (IaC) de la plataforma MailySoft. Este repositorio 
 despliega infraestructura y pipelines; nunca construye ni modifica el código de los
 microservicios (ver [constitution.md](.specify/memory/constitution.md)).
 
-**Fase actual**: Fase 1 de la estrategia multi-nube — Railway completo. Azure y AWS llegan
-en fases posteriores (Principio II de la constitución).
+**Fase actual**: Fase 2 de la estrategia multi-nube — Railway **y** Azure operativos como
+proveedor único por entorno (ver
+[specs/002-single-provider-deployment](specs/002-single-provider-deployment/)); AWS llega en
+una fase posterior (Principio II de la constitución).
 
 ## Estructura
 
@@ -54,7 +56,22 @@ Campos disponibles: ver
    Environment correspondiente con sus reglas de protección, y añadir un job más en
    `.github/workflows/terraform-apply.yml` que lo declare.
 
-## Añadir un proveedor nuevo (fase futura)
+## Elegir Railway o Azure para un entorno
+
+Desde `002-single-provider-deployment`, cada entorno tiene un único campo
+`environment_provider` (`"railway"` o `"azure"`) en su `environment.tfvars`: cambiarlo mueve
+las dos aplicaciones web, las seis APIs y la base de datos de ese entorno al otro proveedor.
+Un servicio individual puede seguir declarando su propio `provider` si de verdad necesita
+desviarse del resto del entorno (Principio II), pero entonces el `check` de
+`environments/<entorno>/main.tf` lo señala como advertencia explícita en la previsualización
+(FR-014) — no es el camino silencioso por defecto. Ver
+[specs/002-single-provider-deployment/spec.md](specs/002-single-provider-deployment/spec.md).
+
+Elegir Azure exige además `azure_location` en ese mismo archivo (región de Azure para el
+resource group, la VNet, el Container Apps Environment y el App Service de ese entorno — ver
+[modules/network-domain/azure/README.md](modules/network-domain/azure/README.md)).
+
+## Añadir un proveedor nuevo (AWS, Fase 3)
 
 Ver la sección "Añadir un proveedor nuevo" de [modules/service/README.md](modules/service/README.md).
 En resumen: un submódulo nuevo bajo `modules/service/<proveedor>/` con la misma interfaz, y
@@ -68,3 +85,7 @@ un bloque más en `modules/service/main.tf`. Ningún entorno existente cambia.
 - [Guía de validación (quickstart.md)](specs/001-railway-deployment/quickstart.md)
 - [ADR 0001: provider comunitario de Railway](docs/adr/0001-railway-terraform-community-provider.md)
 - [Runbook de rollback](docs/runbooks/rollback.md)
+- [Fase 2 — un solo proveedor por entorno (spec, plan, research, data-model, contracts, quickstart)](specs/002-single-provider-deployment/)
+- [ADR 0002: App Service + Container Apps en Azure](docs/adr/0002-azure-compute-choice.md)
+- [ADR 0003: Postgres administrado en Railway, riesgo sin verificar](docs/adr/0003-railway-postgres-sin-verificar.md)
+- [Diagramas de despliegue (Railway y Azure)](docs/diagrams/despliegue-mailysoft.html)

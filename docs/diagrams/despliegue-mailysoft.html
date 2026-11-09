@@ -1,0 +1,401 @@
+<title>Despliegue MailySoft</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* layout: curvas suaves en vez de codos para que las lineas se distingan al cruzarse; la API
+   bisagra (users) va al centro de su fila para que sus llamadas vecinas sean cortas */
+:root{
+  --bg:#0b0e14; --surface:#141922; --surface2:#1b2230; --fg:#e7eaf0; --muted:#8a93a6; --border:#2a3142;
+  --rail-app:#c9a8ff; --rail-api:#8f6fd1; --db:#5bb0ec; --auth:#f4ac4d; --gap:#ef6b61; --warn-bg:#241318;
+  --nsg:#49b37c;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="light"]){
+    --bg:#eef1f6; --surface:#ffffff; --surface2:#f5f7fb; --fg:#1c2230; --muted:#5c6679; --border:#d7dce6;
+    --rail-app:#8450e0; --rail-api:#5e3fa3; --db:#1f78c1; --auth:#b9700f; --gap:#c23b31; --warn-bg:#fdecea;
+    --nsg:#1f8a57;
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#eef1f6; --surface:#ffffff; --surface2:#f5f7fb; --fg:#1c2230; --muted:#5c6679; --border:#d7dce6;
+  --rail-app:#8450e0; --rail-api:#5e3fa3; --db:#1f78c1; --auth:#b9700f; --gap:#c23b31; --warn-bg:#fdecea;
+  --nsg:#1f8a57;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif}
+.wrap{max-width:1700px;margin:0 auto;padding:32px max(16px,env(safe-area-inset-right,0px)) 56px max(16px,env(safe-area-inset-left,0px))}
+header h1{font-size:22px;font-weight:600;margin:0 0 6px}
+header p{margin:0;color:var(--muted);font-size:14px;max-width:1000px;line-height:1.5}
+h2.section-title{font-size:18px;font-weight:600;margin:52px 0 4px;padding-top:28px;border-top:1px solid var(--border)}
+h2.section-title + p{margin:0 0 6px;color:var(--muted);font-size:14px;max-width:1000px;line-height:1.5}
+figure{margin:24px 0 0}
+figure svg{width:100%;height:auto;display:block;overflow:visible}
+figcaption{margin-top:14px;font-size:13px;color:var(--muted);line-height:1.5;max-width:1150px}
+.legend{display:flex;flex-wrap:wrap;gap:16px;margin:20px 0 0;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{display:inline-block;width:22px;height:0;border-top:2.5px solid currentColor}
+.legend i.dashed{border-top-style:dashed}
+.legend .c-user{color:var(--muted)} .legend .c-auth{color:var(--auth)} .legend .c-railapp{color:var(--rail-app)}
+.legend .c-railapi{color:var(--rail-api)} .legend .c-db{color:var(--db)} .legend .c-gap{color:var(--gap)} .legend .c-nsg{color:var(--nsg)}
+.notes{margin-top:28px;border-top:1px solid var(--border);padding-top:20px}
+.notes h2{font-size:14px;font-weight:600;margin:0 0 10px;letter-spacing:.02em;text-transform:uppercase;color:var(--muted)}
+.notes ul{margin:0;padding-left:20px;font-size:13.5px;line-height:1.6}
+.notes li{margin-bottom:9px}
+.notes b{color:var(--fg)}
+.m{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px}
+text{font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif;fill:var(--fg)}
+.mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+.sub{fill:var(--muted)}
+.tiny{font-size:10px}
+.lbl{font-size:10.5px}
+.lbl-bg{fill:var(--bg);opacity:.88}
+.boundary-label{font-size:12px;font-weight:600;letter-spacing:.05em;fill:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Despliegue MailySoft</h1>
+    <p>Dos diagramas: la topología en Railway (nombres de servicio definitivos, líneas redibujadas para distinguirse al cruzar) y su equivalente en Azure con redes virtuales y NSG, que sí imponen de verdad quién habla con quién.</p>
+  </header>
+
+  <h2 class="section-title">1. Railway</h2>
+  <p>Backoffice y frontend con dominio público; las seis APIs y <span class="m">maily-db</span> sin él. Las llamadas entre apps y APIs van en lila claro, las llamadas entre APIs en lila oscuro, el acceso a la base en azul — y uso curvas en vez de ángulos rectos para que, donde dos líneas se crucen, se note cuál es cuál.</p>
+
+  <figure>
+    <svg viewBox="0 0 1700 1000" role="img" aria-label="Diagrama de despliegue en Railway: maily-backoffice y maily-frontend tienen dominio público; maily-users-api, maily-system-api, maily-clinics-api, maily-schedule-api, maily-patients-api y maily-public-api no tienen dominio público; maily-db vive en Railway y solo las APIs la usan, aunque Railway no separa esa red de la de las APIs; mailySoft-DB aplica migraciones desde fuera.">
+      <defs>
+        <marker id="a-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+        <marker id="a-auth" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--auth)"/></marker>
+        <marker id="a-railapp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--rail-app)"/></marker>
+        <marker id="a-railapi" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--rail-api)"/></marker>
+        <marker id="a-db" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--db)"/></marker>
+        <marker id="a-gap" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--gap)"/></marker>
+      </defs>
+
+      <!-- ===== actores + Auth0 ===== -->
+      <rect x="240" y="32" width="220" height="56" rx="10" fill="var(--surface2)" stroke="var(--border)"/>
+      <text x="350" y="65" text-anchor="middle" font-size="13">Equipo de plataforma</text>
+      <rect x="790" y="32" width="220" height="56" rx="10" fill="var(--surface2)" stroke="var(--border)"/>
+      <text x="900" y="65" text-anchor="middle" font-size="13">Personal de clínicas</text>
+      <rect x="1030" y="32" width="200" height="56" rx="10" fill="var(--surface2)" stroke="var(--border)"/>
+      <text x="1130" y="65" text-anchor="middle" font-size="13">Público / anónimo</text>
+      <rect x="1440" y="32" width="190" height="56" rx="10" fill="var(--surface2)" stroke="var(--auth)" stroke-width="1.6"/>
+      <text x="1535" y="56" text-anchor="middle" font-size="13.5" font-weight="600">Auth0</text>
+      <text x="1535" y="72" text-anchor="middle" class="sub tiny">identidad · SaaS externo</text>
+
+      <!-- persona -> app -->
+      <path d="M350,88 C350,118 350,118 350,145" fill="none" stroke="var(--muted)" stroke-width="1.6" marker-end="url(#a-muted)"/>
+      <rect x="312" y="112" width="76" height="15" class="lbl-bg"/><text x="350" y="123" text-anchor="middle" class="lbl sub">https</text>
+
+      <path d="M900,88 C900,120 1000,120 1000,145" fill="none" stroke="var(--muted)" stroke-width="1.6" marker-end="url(#a-muted)"/>
+      <rect x="848" y="110" width="118" height="15" class="lbl-bg"/><text x="907" y="121" text-anchor="middle" class="lbl sub">sesión (Auth0)</text>
+
+      <path d="M1130,88 C1130,122 1040,122 1040,145" fill="none" stroke="var(--muted)" stroke-width="1.6" marker-end="url(#a-muted)"/>
+      <rect x="1000" y="124" width="118" height="15" class="lbl-bg"/><text x="1059" y="135" text-anchor="middle" class="lbl sub">página pública</text>
+
+      <!-- bus Auth0: backoffice, users-api, frontend (orden de izq. a der. = orden de entrada) -->
+      <path d="M350,145 C350,100 1480,100 1480,88" fill="none" stroke="var(--auth)" stroke-width="1.6" marker-end="url(#a-auth)"/>
+      <rect x="690" y="92" width="64" height="15" class="lbl-bg"/><text x="722" y="103" text-anchor="middle" class="lbl" fill="var(--auth)">login</text>
+
+      <path d="M1000,145 C1000,106 1600,106 1600,88" fill="none" stroke="var(--auth)" stroke-width="1.6" marker-end="url(#a-auth)"/>
+      <rect x="1230" y="98" width="64" height="15" class="lbl-bg"/><text x="1262" y="109" text-anchor="middle" class="lbl" fill="var(--auth)">login</text>
+
+      <path d="M650,360 C650,96 1540,96 1540,88" fill="none" stroke="var(--auth)" stroke-width="1.6" marker-end="url(#a-auth)"/>
+      <rect x="1310" y="112" width="150" height="15" class="lbl-bg"/><text x="1385" y="123" text-anchor="middle" class="lbl" fill="var(--auth)">JWKS + altas/bajas</text>
+
+      <!-- ===== limite Railway ===== -->
+      <rect x="30" y="150" width="1650" height="650" rx="16" fill="none" stroke="var(--rail-app)" stroke-width="1.4" stroke-dasharray="2 4"/>
+      <text x="54" y="176" class="boundary-label" fill="var(--rail-app)">RAILWAY · PROYECTO MAILYSOFT — UNA SOLA RED PRIVADA POR ENTORNO</text>
+
+      <!-- fila publica -->
+      <rect x="230" y="200" width="240" height="90" rx="12" fill="var(--surface)" stroke="var(--auth)" stroke-width="1.6"/>
+      <text x="350" y="230" text-anchor="middle" class="mono" font-size="14.5">maily-backoffice</text>
+      <text x="350" y="249" text-anchor="middle" class="sub tiny">backoffice de plataforma</text>
+      <text x="350" y="264" text-anchor="middle" font-size="10.5" fill="var(--auth)">dominio público (internet)</text>
+
+      <rect x="880" y="200" width="240" height="90" rx="12" fill="var(--surface)" stroke="var(--auth)" stroke-width="1.6"/>
+      <text x="1000" y="230" text-anchor="middle" class="mono" font-size="14.5">maily-frontend</text>
+      <text x="1000" y="249" text-anchor="middle" class="sub tiny">frontend de clínicas</text>
+      <text x="1000" y="264" text-anchor="middle" font-size="10.5" fill="var(--auth)">dominio público (internet)</text>
+
+      <!-- fila APIs: clinics, system, users(bisagra), schedule, patients, public -->
+      <rect x="55" y="360" width="190" height="100" rx="12" fill="var(--surface)" stroke="var(--border)"/>
+      <text x="150" y="390" text-anchor="middle" class="mono" font-size="13">maily-clinics-api</text>
+      <text x="150" y="408" text-anchor="middle" class="sub tiny">clínicas · consultorios</text>
+      <text x="150" y="422" text-anchor="middle" font-size="10" fill="var(--rail-api)">privado — sin dominio</text>
+
+      <rect x="280" y="360" width="190" height="100" rx="12" fill="var(--surface)" stroke="var(--border)"/>
+      <text x="375" y="390" text-anchor="middle" class="mono" font-size="13">maily-system-api</text>
+      <text x="375" y="408" text-anchor="middle" class="sub tiny">suscripciones · salud</text>
+      <text x="375" y="422" text-anchor="middle" font-size="10" fill="var(--rail-api)">privado — sin dominio</text>
+
+      <rect x="555" y="360" width="190" height="100" rx="12" fill="var(--surface)" stroke="var(--border)"/>
+      <text x="650" y="390" text-anchor="middle" class="mono" font-size="13">maily-users-api</text>
+      <text x="650" y="408" text-anchor="middle" class="sub tiny">usuarios · roles · permisos</text>
+      <text x="650" y="422" text-anchor="middle" font-size="10" fill="var(--rail-api)">privado — sin dominio</text>
+
+      <rect x="780" y="360" width="190" height="100" rx="12" fill="var(--surface)" stroke="var(--border)"/>
+      <text x="875" y="390" text-anchor="middle" class="mono" font-size="13">maily-schedule-api</text>
+      <text x="875" y="408" text-anchor="middle" class="sub tiny">horarios · citas</text>
+      <text x="875" y="422" text-anchor="middle" font-size="10" fill="var(--rail-api)">privado — sin dominio</text>
+
+      <rect x="1005" y="360" width="190" height="100" rx="12" fill="var(--surface)" stroke="var(--border)"/>
+      <text x="1100" y="390" text-anchor="middle" class="mono" font-size="13">maily-patients-api</text>
+      <text x="1100" y="408" text-anchor="middle" class="sub tiny">pacientes · expedientes</text>
+      <text x="1100" y="422" text-anchor="middle" font-size="10" fill="var(--rail-api)">privado — sin dominio</text>
+
+      <rect x="1230" y="360" width="190" height="100" rx="12" fill="var(--surface)" stroke="var(--border)"/>
+      <text x="1325" y="390" text-anchor="middle" class="mono" font-size="13">maily-public-api</text>
+      <text x="1325" y="408" text-anchor="middle" class="sub tiny">catálogo, sin token</text>
+      <text x="1325" y="422" text-anchor="middle" font-size="10" fill="var(--rail-api)">privado — sin dominio</text>
+
+      <!-- backoffice -> system-api, users-api -->
+      <path d="M390,290 C390,320 375,320 375,360" fill="none" stroke="var(--rail-app)" stroke-width="1.8" marker-end="url(#a-railapp)"/>
+      <rect x="300" y="312" width="155" height="15" class="lbl-bg"/><text x="377" y="323" text-anchor="middle" class="lbl" fill="var(--rail-app)">suscripciones + salud</text>
+
+      <path d="M420,290 C420,335 650,335 650,360" fill="none" stroke="var(--rail-app)" stroke-width="1.8" marker-end="url(#a-railapp)"/>
+      <rect x="470" y="327" width="150" height="15" class="lbl-bg"/><text x="545" y="338" text-anchor="middle" class="lbl" fill="var(--rail-app)">usuarios, roles, salud</text>
+
+      <!-- frontend -> patients, public (derecha, cortas) -->
+      <path d="M1020,290 C1020,320 1100,320 1100,360" fill="none" stroke="var(--rail-app)" stroke-width="1.8" marker-end="url(#a-railapp)"/>
+      <rect x="1040" y="312" width="80" height="15" class="lbl-bg"/><text x="1080" y="323" text-anchor="middle" class="lbl" fill="var(--rail-app)">pacientes</text>
+
+      <path d="M1055,290 C1055,310 1325,310 1325,360" fill="none" stroke="var(--rail-app)" stroke-width="1.8" marker-end="url(#a-railapp)"/>
+      <rect x="1200" y="297" width="150" height="15" class="lbl-bg"/><text x="1275" y="308" text-anchor="middle" class="lbl" fill="var(--rail-app)">catálogo, sin token</text>
+
+      <!-- frontend -> schedule (izquierda, corta) -->
+      <path d="M940,290 C940,330 875,330 875,360" fill="none" stroke="var(--rail-app)" stroke-width="1.8" marker-end="url(#a-railapp)"/>
+      <rect x="800" y="322" width="80" height="15" class="lbl-bg"/><text x="840" y="333" text-anchor="middle" class="lbl" fill="var(--rail-app)">agenda</text>
+
+      <!-- frontend -> clinics (larga, barre por arriba del todo para no pisar el grupo de backoffice) -->
+      <path d="M900,290 C900,340 150,170 150,360" fill="none" stroke="var(--rail-app)" stroke-width="1.8" marker-end="url(#a-railapp)"/>
+      <rect x="470" y="188" width="90" height="15" class="lbl-bg"/><text x="515" y="199" text-anchor="middle" class="lbl" fill="var(--rail-app)">clínicas</text>
+
+      <!-- system-api -> clinics-api, system-api -> users-api (vecinas, cortas) -->
+      <path d="M280,410 C255,410 255,410 245,410" fill="none" stroke="var(--rail-api)" stroke-width="1.7" marker-end="url(#a-railapi)"/>
+      <rect x="150" y="430" width="140" height="14" class="lbl-bg"/><text x="220" y="441" text-anchor="middle" class="lbl" fill="var(--rail-api)">clínicas por plan</text>
+
+      <path d="M470,410 C500,410 525,410 555,410" fill="none" stroke="var(--rail-api)" stroke-width="1.7" marker-end="url(#a-railapi)"/>
+      <rect x="370" y="430" width="200" height="14" class="lbl-bg"/><text x="470" y="441" text-anchor="middle" class="lbl" fill="var(--rail-api)">reenvía el token (no lo valida)</text>
+
+      <!-- schedule-api -> users-api (ahora con token: solida) -->
+      <path d="M780,410 C760,410 745,410 745,410" fill="none" stroke="var(--rail-api)" stroke-width="1.7" marker-end="url(#a-railapi)"/>
+      <rect x="700" y="388" width="140" height="14" class="lbl-bg"/><text x="770" y="399" text-anchor="middle" class="lbl" fill="var(--rail-api)">confirma permiso</text>
+
+      <!-- clinics-api -> users-api: unica que salta system-api; va POR ARRIBA de la fila, no por abajo donde esta el fan de la base -->
+      <path d="M150,360 C150,320 650,320 650,360" fill="none" stroke="var(--rail-api)" stroke-width="1.7" stroke-dasharray="1 0" marker-end="url(#a-railapi)"/>
+      <rect x="330" y="312" width="130" height="14" class="lbl-bg"/><text x="395" y="323" text-anchor="middle" class="lbl" fill="var(--rail-api)">confirma permiso</text>
+
+      <!-- ===== limite de datos (aislamiento previsto, no real en Railway) ===== -->
+      <rect x="560" y="560" width="340" height="190" rx="14" fill="none" stroke="var(--gap)" stroke-width="1.5" stroke-dasharray="3 4"/>
+      <text x="580" y="584" font-size="11" font-weight="600" fill="var(--gap)">RED DE DATOS — AISLAMIENTO PREVISTO,</text>
+      <text x="580" y="598" font-size="11" font-weight="600" fill="var(--gap)">NO IMPUESTO POR RAILWAY (VER AVISO →)</text>
+      <rect x="585" y="615" width="290" height="100" rx="10" fill="var(--surface)" stroke="var(--db)" stroke-width="1.6"/>
+      <text x="730" y="648" text-anchor="middle" font-size="14" font-weight="600">maily-db</text>
+      <text x="730" y="666" text-anchor="middle" class="sub tiny">PostgreSQL en Railway</text>
+      <text x="730" y="681" text-anchor="middle" class="sub tiny">acceso previsto: solo las 6 APIs</text>
+
+      <!-- aviso Railway -->
+      <rect x="950" y="565" width="440" height="180" rx="12" fill="var(--warn-bg)" stroke="var(--gap)" stroke-width="1.3"/>
+      <text x="970" y="590" font-size="12" font-weight="600" fill="var(--gap)">⚠ Railway no tiene VNets ni NSG/ASG</text>
+      <text x="970" y="610" font-size="11.3" fill="var(--fg)">Dentro de un mismo entorno, la red privada</text>
+      <text x="970" y="627" font-size="11.3" fill="var(--fg)">es plana: cualquier servicio puede intentar</text>
+      <text x="970" y="644" font-size="11.3" fill="var(--fg)">hablarle a cualquier otro por su dominio</text>
+      <text x="970" y="661" font-size="11.3" fill="var(--fg)">.railway.internal. Lo único que Railway</text>
+      <text x="970" y="678" font-size="11.3" fill="var(--fg)">impone de verdad es dominio público sí/no.</text>
+      <text x="970" y="700" font-size="11.3" font-weight="600" fill="var(--gap)">"Solo las APIs leen maily-db" se logra por</text>
+      <text x="970" y="717" font-size="11.3" font-weight="600" fill="var(--gap)">credenciales, no por red — ver diagrama Azure.</text>
+      <text x="970" y="734" font-size="11.3" font-weight="600" fill="var(--gap)">para la alternativa con NSG real.</text>
+
+      <!-- APIs -> maily-db: orden de entrada = orden de origen, sin cruces entre ellas -->
+      <path d="M150,460 C150,530 605,540 605,615" fill="none" stroke="var(--db)" stroke-width="1.8" marker-end="url(#a-db)"/>
+      <path d="M375,460 C375,520 635,540 635,615" fill="none" stroke="var(--gap)" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#a-gap)"/>
+      <path d="M650,460 C650,520 690,540 690,615" fill="none" stroke="var(--db)" stroke-width="1.8" marker-end="url(#a-db)"/>
+      <path d="M875,460 C875,520 745,540 745,615" fill="none" stroke="var(--db)" stroke-width="1.8" marker-end="url(#a-db)"/>
+      <path d="M1100,460 C1100,520 800,540 800,615" fill="none" stroke="var(--db)" stroke-width="1.8" marker-end="url(#a-db)"/>
+      <path d="M1325,460 C1325,510 855,545 855,615" fill="none" stroke="var(--db)" stroke-width="1.8" marker-end="url(#a-db)"/>
+      <rect x="180" y="498" width="78" height="14" class="lbl-bg"/><text x="219" y="509" text-anchor="middle" class="lbl" fill="var(--db)">lee/escribe</text>
+      <rect x="660" y="732" width="250" height="28" class="lbl-bg"/>
+      <text x="785" y="744" text-anchor="middle" class="lbl" fill="var(--gap)">código la necesita — faltan credenciales</text>
+      <text x="785" y="756" text-anchor="middle" class="lbl" fill="var(--gap)">(gap heredado de la base en Azure)</text>
+      <rect x="1140" y="498" width="170" height="14" class="lbl-bg"/><text x="1225" y="509" text-anchor="middle" class="lbl" fill="var(--db)">solo lectura, sin token</text>
+
+      <!-- mailySoft-DB / Flyway, fuera de Railway -->
+      <rect x="130" y="840" width="260" height="80" rx="12" fill="var(--surface2)" stroke="var(--border)"/>
+      <text x="260" y="870" text-anchor="middle" font-size="14" font-weight="600">mailySoft-DB</text>
+      <text x="260" y="888" text-anchor="middle" class="sub tiny">Flyway · pipeline de migraciones</text>
+      <text x="260" y="903" text-anchor="middle" class="sub tiny">fuera de Railway, no es un servicio activo</text>
+      <path d="M390,860 C480,860 585,720 585,660" fill="none" stroke="var(--db)" stroke-width="1.8" marker-end="url(#a-db)"/>
+      <rect x="400" y="790" width="130" height="14" class="lbl-bg"/><text x="465" y="801" text-anchor="middle" class="lbl" fill="var(--db)">aplica migraciones</text>
+    </svg>
+    <figcaption>Solo maily-backoffice y maily-frontend tienen dominio público; las seis APIs y maily-db quedan sin exposición a internet, dentro del mismo proyecto de Railway. El recuadro rojo marca que, a diferencia de Azure, Railway no separa esa red en subredes: la frontera "solo las APIs llegan a la base" hay que imponerla con credenciales, no con el equivalente a un NSG.</figcaption>
+  </figure>
+
+  <div class="legend">
+    <span class="c-user"><i></i>acción de una persona</span>
+    <span class="c-auth"><i></i>Auth0</span>
+    <span class="c-railapp"><i></i>app pública → API</span>
+    <span class="c-railapi"><i></i>API → API</span>
+    <span class="c-db"><i></i>acceso a maily-db</span>
+    <span class="c-gap"><i class="dashed"></i>sin implementar / sin aprovisionar</span>
+  </div>
+
+  <section class="notes">
+    <h2>Notas — Railway</h2>
+    <ul>
+      <li><b>Nombres de servicio:</b> ya con la nomenclatura definitiva — <span class="m">maily-users-api</span>, <span class="m">maily-system-api</span>, <span class="m">maily-public-api</span>, <span class="m">maily-clinics-api</span>, <span class="m">maily-schedule-api</span>, <span class="m">maily-patients-api</span>.</li>
+      <li><b>Líneas:</b> dos tonos de lila separan "app pública llamando a una API" de "API llamando a otra API", y todas usan curvas en vez de ángulos rectos. Reordené la fila de APIs para que <span class="m">maily-users-api</span> (a quien le hablan tres de las otras cinco) quede al centro, con sus vecinas directas a cada lado; solo <span class="m">maily-clinics-api</span> necesita saltar por encima de <span class="m">maily-system-api</span> para llegar a ella, y esa es la única línea que lo hace. Con seis APIs hablándose entre sí, con la app pública y con una sola base, algún cruce entre líneas del mismo color es inevitable — por eso cada relación tiene su propio tono y las curvas lo marcan con un trazo limpio, no con un ángulo recto.</li>
+      <li><b>maily-schedule-api ya exige token</b> (como confirmaste): su llamada a <span class="m">maily-users-api</span> para confirmar el permiso ya se dibuja sólida, igual que la de <span class="m">maily-clinics-api</span>.</li>
+      <li>Lo demás (exposición a internet, el límite real de la red privada de Railway, el gap de credenciales de <span class="m">maily-system-api</span>, y que mover <span class="m">maily-db</span> de Azure a Railway es trabajo real) sigue igual que en la versión anterior — ver el recuadro de advertencia en el propio diagrama.</li>
+    </ul>
+  </section>
+
+  <h2 class="section-title">2. Azure — la alternativa con aislamiento de red real</h2>
+  <p>Mismo set de servicios, pero con lo que tú ya conoces: una VNet con tres subredes y un NSG por subred que de verdad decide quién puede hablarle a quién — a diferencia de Railway, esto sí se impone en la red, no solo en las credenciales. Las llamadas entre apps y APIs son las mismas que en el diagrama de Railway (no las repito todas); aquí lo nuevo es el límite de red.</p>
+
+  <figure>
+    <svg viewBox="0 0 1600 940" role="img" aria-label="Diagrama de despliegue en Azure: maily-backoffice y maily-frontend quedan fuera de la VNet, con endpoint público; dentro de la VNet, la subred subred-apis aisla las seis APIs con un NSG que solo permite entrada desde la subred de las apps, y la subred subred-data aisla maily-db con un NSG que solo permite entrada desde subred-apis; Key Vault guarda los secretos y mailySoft-DB aplica migraciones desde fuera de la VNet.">
+      <defs>
+        <marker id="z-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+        <marker id="z-auth" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--auth)"/></marker>
+        <marker id="z-app" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--rail-app)"/></marker>
+        <marker id="z-nsg" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--nsg)"/></marker>
+        <marker id="z-db" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.2" markerHeight="6.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--db)"/></marker>
+      </defs>
+
+      <!-- actores -->
+      <rect x="130" y="30" width="240" height="56" rx="10" fill="var(--surface2)" stroke="var(--border)"/>
+      <text x="250" y="63" text-anchor="middle" font-size="13">Personas (internet)</text>
+      <rect x="1260" y="30" width="190" height="56" rx="10" fill="var(--surface2)" stroke="var(--auth)" stroke-width="1.6"/>
+      <text x="1355" y="54" text-anchor="middle" font-size="13.5" font-weight="600">Auth0</text>
+      <text x="1355" y="70" text-anchor="middle" class="sub tiny">identidad · SaaS externo</text>
+
+      <!-- apps publicas, FUERA de la vnet -->
+      <rect x="130" y="150" width="240" height="90" rx="12" fill="var(--surface)" stroke="var(--auth)" stroke-width="1.6"/>
+      <text x="250" y="180" text-anchor="middle" class="mono" font-size="14">maily-backoffice</text>
+      <text x="250" y="199" text-anchor="middle" class="sub tiny">App Service, endpoint público</text>
+      <text x="250" y="214" text-anchor="middle" font-size="10.5" fill="var(--auth)">fuera de la VNet</text>
+
+      <rect x="430" y="150" width="240" height="90" rx="12" fill="var(--surface)" stroke="var(--auth)" stroke-width="1.6"/>
+      <text x="550" y="180" text-anchor="middle" class="mono" font-size="14">maily-frontend</text>
+      <text x="550" y="199" text-anchor="middle" class="sub tiny">App Service, endpoint público</text>
+      <text x="550" y="214" text-anchor="middle" font-size="10.5" fill="var(--auth)">fuera de la VNet</text>
+
+      <path d="M250,86 C250,110 250,110 250,150" fill="none" stroke="var(--muted)" stroke-width="1.6" marker-end="url(#z-muted)"/>
+      <path d="M250,240 C250,270 1355,270 1355,86" fill="none" stroke="var(--auth)" stroke-width="1.5" marker-end="url(#z-auth)"/>
+      <path d="M550,240 C550,280 1340,280 1340,86" fill="none" stroke="var(--auth)" stroke-width="1.5" marker-end="url(#z-auth)"/>
+      <rect x="640" y="268" width="50" height="14" class="lbl-bg"/><text x="665" y="279" text-anchor="middle" class="lbl" fill="var(--auth)">login</text>
+
+      <!-- integracion de salida hacia la VNet -->
+      <path d="M300,240 C300,280 230,280 230,320" fill="none" stroke="var(--rail-app)" stroke-width="1.8" marker-end="url(#z-app)"/>
+      <path d="M500,240 C500,290 700,290 700,320" fill="none" stroke="var(--rail-app)" stroke-width="1.8" marker-end="url(#z-app)"/>
+      <rect x="330" y="282" width="190" height="14" class="lbl-bg"/><text x="425" y="293" text-anchor="middle" class="lbl" fill="var(--rail-app)">integración VNet (saliente) — mismas llamadas que en Railway</text>
+
+      <!-- VNet -->
+      <rect x="40" y="300" width="1520" height="300" rx="16" fill="none" stroke="var(--nsg)" stroke-width="1.4" stroke-dasharray="2 4"/>
+      <text x="64" y="326" class="boundary-label" fill="var(--nsg)">VNET-MAILYSOFT (10.20.0.0/16)</text>
+
+      <!-- subred-apis -->
+      <rect x="70" y="345" width="1220" height="210" rx="14" fill="none" stroke="var(--nsg)" stroke-width="1.6"/>
+      <text x="90" y="368" font-size="11.5" font-weight="600" fill="var(--nsg)">SUBRED-APIS (10.20.1.0/24) · Container Apps internas o App Service + Private Endpoint</text>
+      <text x="90" y="384" font-size="11" fill="var(--nsg)">NSG-apis: permite entrada solo desde las apps públicas (arriba) y entre sí; deniega internet y subred-data→apis</text>
+
+      <g font-size="13">
+        <rect x="95" y="405" width="180" height="90" rx="10" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="185" y="432" text-anchor="middle" class="mono" font-size="12.5">maily-clinics-api</text>
+        <text x="185" y="449" text-anchor="middle" class="sub tiny">clínicas · consultorios</text>
+        <text x="185" y="463" text-anchor="middle" font-size="9.5" fill="var(--nsg)">sin endpoint público</text>
+
+        <rect x="300" y="405" width="180" height="90" rx="10" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="390" y="432" text-anchor="middle" class="mono" font-size="12.5">maily-system-api</text>
+        <text x="390" y="449" text-anchor="middle" class="sub tiny">suscripciones · salud</text>
+        <text x="390" y="463" text-anchor="middle" font-size="9.5" fill="var(--nsg)">sin endpoint público</text>
+
+        <rect x="505" y="405" width="180" height="90" rx="10" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="595" y="432" text-anchor="middle" class="mono" font-size="12.5">maily-users-api</text>
+        <text x="595" y="449" text-anchor="middle" class="sub tiny">usuarios · roles · permisos</text>
+        <text x="595" y="463" text-anchor="middle" font-size="9.5" fill="var(--nsg)">sin endpoint público</text>
+
+        <rect x="710" y="405" width="180" height="90" rx="10" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="800" y="432" text-anchor="middle" class="mono" font-size="12.5">maily-schedule-api</text>
+        <text x="800" y="449" text-anchor="middle" class="sub tiny">horarios · citas</text>
+        <text x="800" y="463" text-anchor="middle" font-size="9.5" fill="var(--nsg)">sin endpoint público</text>
+
+        <rect x="915" y="405" width="180" height="90" rx="10" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="1005" y="432" text-anchor="middle" class="mono" font-size="12.5">maily-patients-api</text>
+        <text x="1005" y="449" text-anchor="middle" class="sub tiny">pacientes · expedientes</text>
+        <text x="1005" y="463" text-anchor="middle" font-size="9.5" fill="var(--nsg)">sin endpoint público</text>
+
+        <rect x="1120" y="405" width="150" height="90" rx="10" fill="var(--surface)" stroke="var(--border)"/>
+        <text x="1195" y="432" text-anchor="middle" class="mono" font-size="12">maily-public-api</text>
+        <text x="1195" y="449" text-anchor="middle" class="sub tiny">catálogo, sin token</text>
+        <text x="1195" y="463" text-anchor="middle" font-size="9.5" fill="var(--nsg)">sin endpoint público</text>
+      </g>
+      <text x="680" y="520" text-anchor="middle" class="sub tiny">(las llamadas entre estas seis APIs son las mismas que en el diagrama de Railway)</text>
+
+      <!-- Key Vault -->
+      <rect x="1310" y="395" width="210" height="100" rx="12" fill="var(--surface2)" stroke="var(--border)"/>
+      <text x="1415" y="424" text-anchor="middle" font-size="13" font-weight="600">Azure Key Vault</text>
+      <text x="1415" y="442" text-anchor="middle" class="sub tiny">DATABASE_URL, secretos de Auth0</text>
+      <text x="1415" y="457" text-anchor="middle" class="sub tiny">leído por Managed Identity</text>
+      <path d="M1270,450 C1290,450 1290,450 1310,450" fill="none" stroke="var(--db)" stroke-width="1.6" marker-end="url(#z-db)"/>
+      <text x="1272" y="440" text-anchor="end" class="lbl" fill="var(--db)">las 6 APIs</text>
+
+      <!-- subred-data -->
+      <rect x="430" y="610" width="440" height="155" rx="14" fill="none" stroke="var(--nsg)" stroke-width="1.6"/>
+      <text x="450" y="633" font-size="11.5" font-weight="600" fill="var(--nsg)">SUBRED-DATA (10.20.2.0/24) · Postgres Flexible Server, acceso privado</text>
+      <text x="450" y="649" font-size="11" fill="var(--nsg)">NSG-data: permite entrada SOLO desde subred-apis; deniega todo lo demás, incluida subred-web</text>
+      <rect x="500" y="665" width="290" height="80" rx="10" fill="var(--surface)" stroke="var(--db)" stroke-width="1.6"/>
+      <text x="645" y="693" text-anchor="middle" font-size="14" font-weight="600">maily-db</text>
+      <text x="645" y="710" text-anchor="middle" class="sub tiny">PostgreSQL Flexible Server</text>
+      <text x="645" y="725" text-anchor="middle" class="sub tiny">sin endpoint público, VNet-integrado</text>
+
+      <!-- subred-apis -> subred-data, agregado -->
+      <path d="M680,555 C680,585 645,600 645,665" fill="none" stroke="var(--db)" stroke-width="2.4" marker-end="url(#z-db)"/>
+      <rect x="690" y="585" width="260" height="15" class="lbl-bg"/><text x="820" y="596" text-anchor="middle" class="lbl" fill="var(--db)">las 6 APIs → maily-db (NSG-data lo permite)</text>
+
+      <!-- mailySoft-DB / Flyway, fuera de la VNet -->
+      <rect x="40" y="800" width="300" height="100" rx="12" fill="var(--surface2)" stroke="var(--border)"/>
+      <text x="190" y="828" text-anchor="middle" font-size="14" font-weight="600">mailySoft-DB</text>
+      <text x="190" y="846" text-anchor="middle" class="sub tiny">Flyway · pipeline de migraciones</text>
+      <text x="190" y="861" text-anchor="middle" class="sub tiny">corre fuera de la VNet (GitHub Actions)</text>
+      <text x="190" y="876" fill="var(--gap)" text-anchor="middle" font-size="10.5">necesita una excepción: runner dentro de</text>
+      <text x="190" y="889" fill="var(--gap)" text-anchor="middle" font-size="10.5">la VNet o regla temporal del NSG-data</text>
+      <path d="M340,840 C420,840 500,780 500,715" fill="none" stroke="var(--db)" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#z-db)"/>
+
+      <!-- resumen NSG a la derecha -->
+      <rect x="1120" y="610" width="400" height="155" rx="14" fill="var(--warn-bg)" stroke="var(--nsg)" stroke-width="1.3"/>
+      <text x="1140" y="635" font-size="12" font-weight="600" fill="var(--nsg)">✓ Esto sí es un aislamiento real</text>
+      <text x="1140" y="655" font-size="11.3" fill="var(--fg)">Cada NSG de subred decide, en la red,</text>
+      <text x="1140" y="672" font-size="11.3" fill="var(--fg)">quién entra — no depende de que una app</text>
+      <text x="1140" y="689" font-size="11.3" fill="var(--fg)">no tenga credenciales: aunque backoffice</text>
+      <text x="1140" y="706" font-size="11.3" fill="var(--fg)">tuviera el connection string de maily-db,</text>
+      <text x="1140" y="723" font-size="11.3" fill="var(--fg)">NSG-data igual rechaza el paquete porque</text>
+      <text x="1140" y="740" font-size="11.3" fill="var(--fg)">no viene de subred-apis.</text>
+      <text x="1140" y="757" font-size="10.3" fill="var(--muted)">(App Service: hace falta Private Endpoint o Access Restrictions; el NSG solo no basta)</text>
+    </svg>
+    <figcaption>Dos NSG, uno por subred, son la frontera real: NSG-apis solo deja pasar a las dos apps públicas (y a las APIs entre sí); NSG-data solo deja pasar a las APIs. A diferencia de Railway, esta regla la aplica la red, no quién tiene o no una contraseña. Para App Service puro hace falta además deshabilitar el endpoint público y usar Private Endpoint o Access Restrictions; Container Apps con entorno interno lo da de fábrica.</figcaption>
+  </figure>
+
+  <div class="legend">
+    <span class="c-user"><i></i>acción de una persona</span>
+    <span class="c-auth"><i></i>Auth0 / login</span>
+    <span class="c-railapp"><i></i>integración saliente hacia la VNet</span>
+    <span class="c-db"><i></i>acceso a datos / secretos</span>
+    <span class="c-nsg"><i></i>límite de subred impuesto por NSG</span>
+  </div>
+
+  <section class="notes">
+    <h2>Notas — Azure</h2>
+    <ul>
+      <li><b>Esto es justo lo que pediste al abrir el tema:</b> redes virtuales y NSG controlando de verdad quién llega a quién. En Azure sí hay un equivalente real a lo que describiste, a diferencia de Railway.</li>
+      <li><b>App Service vs. Container Apps para las seis APIs:</b> ambos funcionan. Container Apps con un <i>Environment</i> interno no tiene FQDN público por defecto — el aislamiento es automático. Con App Service hay que deshabilitar el acceso público y añadir un Private Endpoint en subred-apis (o usar Access Restrictions "solo VNet"); el NSG de la subred por sí solo no bloquea el endpoint público de un App Service, porque ese endpoint no pasa por la subred.</li>
+      <li><b>Application Security Groups (ASG):</b> son más para agrupar VMs o NICs y así escribir reglas de NSG sin depender de rangos de IP. Con App Service/Container Apps (sin VMs propias) no aplican directamente — aquí el control real es el NSG por subred más Private Endpoint/Access Restrictions. Si en el futuro corres algo en VMs o AKS, ahí sí valdría usar ASGs para no tener que mantener listas de IPs en las reglas.</li>
+      <li><b>maily-db:</b> este diagrama representa cómo está desplegada hoy en la práctica (Azure Database for PostgreSQL Flexible Server) — es el que corresponde a tu infraestructura real actual, a diferencia del diagrama de Railway, donde la moviste ahí como destino nuevo.</li>
+      <li><b>mailySoft-DB (Flyway) necesita una excepción real:</b> si subred-data solo acepta tráfico de subred-apis, el pipeline de migraciones (que corre fuera de la VNet, p. ej. en GitHub Actions) no puede llegar a <span class="m">maily-db</span> sin ayuda. Las dos salidas usuales: un runner autoalojado dentro de la VNet, o una regla temporal del NSG-data que se abre solo durante el despliegue. Vale la pena decidir esto antes de cerrar subred-data del todo.</li>
+      <li><b>Azure Key Vault</b> ya aparece en tu Terraform (<span class="m">azure_key_vault_id</span>) — lo mantuve en el diagrama porque es donde deberían vivir <span class="m">DATABASE_URL</span> y los secretos de Auth0, leídos por cada API vía Managed Identity en vez de variables de entorno planas.</li>
+    </ul>
+  </section>
+</div>

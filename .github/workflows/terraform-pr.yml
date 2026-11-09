@@ -102,6 +102,18 @@ jobs:
           HAS_DESTRUCTIVE=$(jq -r '[.resource_changes[]? | select(.change.actions | contains(["delete"]))] | length > 0' plan.json)
           echo "has_destructive=${HAS_DESTRUCTIVE}" >> "$GITHUB_OUTPUT"
 
+      - name: Leer garantia de aislamiento y advertencia de mezcla de proveedores (FR-007/FR-014, 002-single-provider-deployment)
+        id: isolation
+        working-directory: environments/${{ matrix.environment }}
+        run: |
+          # isolation_guarantee: output raiz de environments/<entorno>/outputs.tf (FR-007).
+          GUARANTEE=$(jq -r '.planned_values.outputs.isolation_guarantee.value // "desconocida"' plan.json)
+          echo "guarantee=${GUARANTEE}" >> "$GITHUB_OUTPUT"
+          # check "provider_consistency" (environments/<entorno>/main.tf): un check en estado
+          # "fail" es la advertencia de FR-014, no un error de validate/plan.
+          HAS_PROVIDER_MIX=$(jq -r '[.checks[]? | select(.status == "fail")] | length > 0' plan.json)
+          echo "has_provider_mix=${HAS_PROVIDER_MIX}" >> "$GITHUB_OUTPUT"
+
       - name: Publicar previsualizacion en el PR (FR-008, FR-011)
         uses: actions/github-script@v7
         with:
@@ -119,7 +131,13 @@ jobs:
             const warning = destructive
               ? '\n> ⚠️ **CAMBIO DESTRUCTIVO**: este plan elimina o reemplaza uno o más recursos existentes. Requiere aprobación explícita antes de aplicarse (FR-010).\n'
               : '';
-            const body = `### Previsualización de Terraform — \`${{ matrix.environment }}\`${warning}\n\n<details><summary>Ver plan completo</summary>\n\n\`\`\`\n${plan}\n\`\`\`\n\n</details>`;
+            const providerMix = '${{ steps.isolation.outputs.has_provider_mix }}' === 'true';
+            const mixWarning = providerMix
+              ? '\n> ⚠️ **MEZCLA DE PROVEEDORES**: uno o más servicios (o la base de datos) de este entorno tienen un proveedor distinto al configurado en `environment_provider`. Requiere confirmación explícita antes de aplicarse (FR-014, 002-single-provider-deployment).\n'
+              : '';
+            const guarantee = '${{ steps.isolation.outputs.guarantee }}';
+            const guaranteeLine = `\n> 🔒 **Garantía de aislamiento API↔base en \`${{ matrix.environment }}\`**: \`${guarantee}\`${guarantee === 'credenciales' ? ' (Railway: no hay regla de red equivalente a un NSG; la garantía depende de a quién se le entregan las credenciales — ver specs/002-single-provider-deployment/research.md §2 y §4)' : ''}\n`;
+            const body = `### Previsualización de Terraform — \`${{ matrix.environment }}\`${warning}${mixWarning}${guaranteeLine}\n\n<details><summary>Ver plan completo</summary>\n\n\`\`\`\n${plan}\n\`\`\`\n\n</details>`;
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
