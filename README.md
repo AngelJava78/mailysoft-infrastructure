@@ -15,7 +15,8 @@ una fase posterior (Principio II de la constitución).
 bootstrap/        # Terraform de un solo uso (estado local) para crear el backend remoto
                    # y el proyecto de Railway — ver docs/runbooks/bootstrap.md
 modules/           # Módulos reutilizables por tipo de recurso, por proveedor
-environments/      # Configuración y estado por entorno: dev, staging, production
+environments/      # Un solo root de Terraform (ADR 0007) + datos por entorno en dev/, staging/,
+                   # production/ (*.tfvars + backend.hcl, sin código duplicado)
 .github/workflows/ # Pipelines de CI/CD (fmt -> validate -> lint -> security-scan -> plan -> apply)
 docs/adr/          # Decisiones de arquitectura
 docs/runbooks/     # Procedimientos operativos (bootstrap, rollback)
@@ -25,8 +26,10 @@ specs/             # Especificación, plan y tareas de esta fase (Spec Kit)
 ## Primeros pasos
 
 1. Ejecutar el bootstrap una sola vez: [docs/runbooks/bootstrap.md](docs/runbooks/bootstrap.md).
-2. Completar los valores pendientes (`<...>`) en `environments/*/backend.tf` y
-   `environments/*/*.tfvars` con las salidas del bootstrap.
+2. Completar los valores pendientes (`<...>`) en `environments/<entorno>/*.tfvars` con las
+   salidas del bootstrap (ADR 0007: `environments/` es un solo root compartido; cada entorno
+   solo aporta datos, no código — el workspace de HCP Terraform de cada uno se selecciona con
+   `$env:TF_WORKSPACE`, no con un archivo).
 3. Abrir un PR que toque `environments/**` — el pipeline de PR generará automáticamente una
    previsualización (`terraform-pr.yml`).
 4. Tras la revisión y el merge, `terraform-apply.yml` aplica a `dev`/`staging`
@@ -45,31 +48,56 @@ Campos disponibles: ver
 [data-model.md](specs/001-railway-deployment/data-model.md) y el contrato de
 [modules/service](modules/service/README.md).
 
+## Promover entorno por entorno (dev -> staging -> production)
+
+El pipeline aplica los tres entornos en cada push a `main` que toque `environments/**` o
+`modules/**`, pero eso no obliga a desplegar un servicio en los tres a la vez: el campo
+`enabled` de cada entrada de `services.tfvars` controla, por servicio y por entorno, si se
+crea algo o no (`environments/main.tf`, el root compartido de ADR 0007, filtra las entradas
+`enabled` antes de llamar a `modules/service/railway`). Para probar primero en `dev` antes de tocar
+`staging`/`production`, dejar `enabled = false` en las entradas de esos entornos hasta
+confirmar en `dev`, y recién ahí cambiar a `true` ahí (otro PR, otra previsualización) para
+promoverlo.
+
 ## Añadir un entorno nuevo
 
-1. Copiar la estructura de `environments/dev/` (`versions.tf`, `providers.tf`, `backend.tf`,
-   `variables.tf`, `main.tf`) a `environments/<nuevo-entorno>/`.
-2. Cambiar `container_name` en `backend.tf` a un contenedor dedicado del nuevo entorno
-   (crearlo en `bootstrap/azure-backend` primero).
-3. Crear `environment.tfvars`, `database.tfvars` y `services.tfvars` propios.
-4. Si el entorno necesita un gate de aprobación (como `production`), crear el GitHub
+**ADR [0007](docs/adr/0007-root-unico-environments.md)**: `environments/` es un solo root de
+Terraform compartido — añadir un entorno nunca copia código, solo datos:
+
+1. Crear en app.terraform.io un workspace `mailysoft-<nuevo-entorno>` (Execution Mode = Local,
+   ver [docs/runbooks/bootstrap.md](docs/runbooks/bootstrap.md)), y
+   `environments/<nuevo-entorno>/` con `environment.tfvars`, `database.tfvars` y
+   `services.tfvars` propios (sin ningún archivo `.tf`: el workspace se selecciona con
+   `$env:TF_WORKSPACE = "mailysoft-<nuevo-entorno>"`, no con un archivo).
+2. Añadir `<nuevo-entorno>` a la validación de `environment_name` en `environments/variables.tf`
+   y a la matriz (`matrix.environment`) de `terraform-pr.yml`/`terraform-drift.yml`.
+3. Si el entorno necesita un gate de aprobación (como `production`), crear el GitHub
    Environment correspondiente con sus reglas de protección, y añadir un job más en
    `.github/workflows/terraform-apply.yml` que lo declare.
 
 ## Elegir Railway o Azure para un entorno
 
-Desde `002-single-provider-deployment`, cada entorno tiene un único campo
-`environment_provider` (`"railway"` o `"azure"`) en su `environment.tfvars`: cambiarlo mueve
-las dos aplicaciones web, las seis APIs y la base de datos de ese entorno al otro proveedor.
-Un servicio individual puede seguir declarando su propio `provider` si de verdad necesita
-desviarse del resto del entorno (Principio II), pero entonces el `check` de
-`environments/<entorno>/main.tf` lo señala como advertencia explícita en la previsualización
-(FR-014) — no es el camino silencioso por defecto. Ver
-[specs/002-single-provider-deployment/spec.md](specs/002-single-provider-deployment/spec.md).
+**ADR [0005](docs/adr/0005-separar-roots-por-proveedor.md)** (2026-11-10, corrige el diseño
+original de `002-single-provider-deployment`): el root compartido `environments/` (ADR 0007) es
+**100% Railway por construcción** para los tres entornos — no declara el provider `azurerm` ni
+referencian ningún módulo de Azure, ni siquiera con `count = 0`. Esto no es una preferencia:
+se confirmó contra tres `terraform plan` reales que no existe ninguna combinación de
+credenciales de relleno que deje a `azurerm` "inofensivo" cuando está declarado pero sin uso —
+Terraform siempre intenta autenticarlo de verdad.
 
-Elegir Azure exige además `azure_location` en ese mismo archivo (región de Azure para el
-resource group, la VNet, el Container Apps Environment y el App Service de ese entorno — ver
-[modules/network-domain/azure/README.md](modules/network-domain/azure/README.md)).
+Por eso, elegir Azure para un entorno **ya no es cambiar un único campo** en
+`environment.tfvars` — requiere un root de Terraform distinto para ese entorno (que sí
+declare `provider "azurerm"` y use el despachador genérico `modules/service`, con sus tres
+ramas railway/azure/aws). Ese root todavía no existe en el repositorio porque ningún entorno
+lo necesita hoy (los tres están en Railway); los módulos para Azure
+(`modules/service/azure`, `modules/database/azure-existing`, `modules/network-domain/azure`)
+siguen intactos, listos para cuando haga falta construirlo. El backend de estado también
+sigue esa misma separación (ADR [0004](docs/adr/0004-backend-estado-desacoplado-de-proveedor.md)):
+HCP Terraform para roots Railway, `azurerm` de `bootstrap/azure-backend` para un futuro root
+Azure.
+
+Ver [specs/002-single-provider-deployment/spec.md](specs/002-single-provider-deployment/spec.md)
+para el diseño original de FR-001, y el ADR 0005 para la corrección.
 
 ## Añadir un proveedor nuevo (AWS, Fase 3)
 
@@ -88,4 +116,8 @@ un bloque más en `modules/service/main.tf`. Ningún entorno existente cambia.
 - [Fase 2 — un solo proveedor por entorno (spec, plan, research, data-model, contracts, quickstart)](specs/002-single-provider-deployment/)
 - [ADR 0002: App Service + Container Apps en Azure](docs/adr/0002-azure-compute-choice.md)
 - [ADR 0003: Postgres administrado en Railway, riesgo sin verificar](docs/adr/0003-railway-postgres-sin-verificar.md)
+- [ADR 0004: backend de estado desacoplado de proveedor](docs/adr/0004-backend-estado-desacoplado-de-proveedor.md)
+- [ADR 0005: separar roots por proveedor](docs/adr/0005-separar-roots-por-proveedor.md)
+- [ADR 0006: un proyecto de Railway por entorno](docs/adr/0006-un-proyecto-railway-por-entorno.md)
+- [ADR 0007: root único en environments/](docs/adr/0007-root-unico-environments.md)
 - [Diagramas de despliegue (Railway y Azure)](docs/diagrams/despliegue-mailysoft.html)

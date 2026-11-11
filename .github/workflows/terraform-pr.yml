@@ -1,6 +1,12 @@
 # Contrato: specs/001-railway-deployment/contracts/pipeline-contract.md
 # En pull requests SOLO se ejecuta fmt -> validate -> lint -> security-scan -> plan (FR-008).
 # Nunca se ejecuta apply aqui (ver terraform-apply.yml).
+#
+# ADR 0007: environments/ es un solo root de Terraform compartido por los tres entornos
+# (environments/<entorno>/ solo contiene *.tfvars + backend.hcl, ya no copias de *.tf) —
+# validate/lint/security-scan corren UNA vez sobre el root compartido (no por entorno, ya que
+# el codigo es identico); solo init/plan necesitan repetirse por entorno (distinto backend y
+# distintos valores de variables).
 
 name: Terraform PR
 
@@ -18,7 +24,7 @@ permissions:
   pull-requests: write # publicar el resultado del plan como comentario (FR-008)
 
 env:
-  TF_VERSION: "1.15.0" # confirmar version exacta disponible — research.md seccion 7
+  TF_VERSION: "1.17.1" # confirmado 2026-11-09 contra la version real instalada — research.md seccion 7
   TF_IN_AUTOMATION: "true"
 
 jobs:
@@ -32,10 +38,42 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
       - run: terraform fmt -check -recursive -diff
 
-  plan:
-    name: Validar y previsualizar (${{ matrix.environment }})
+  validate:
+    name: Validar, lint y security-scan (root compartido)
     runs-on: ubuntu-latest
     needs: fmt
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform init (sin backend; solo valida sintaxis/modulos)
+        working-directory: environments
+        run: terraform init -backend=false -input=false
+
+      - name: terraform validate
+        working-directory: environments
+        run: terraform validate
+
+      - name: tflint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      - run: tflint --chdir=environments --config="${{ github.workspace }}/.tflint.hcl"
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: environments
+          config_file: .checkov.yaml
+          quiet: true
+
+  plan:
+    name: Previsualizar (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    needs: validate
     strategy:
       fail-fast: false
       matrix:
@@ -47,55 +85,59 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      # OIDC: identidad de Azure NO acotada por entorno (ver bootstrap/azure-backend/oidc.tf);
+      # ADR 0004: azure/login solo hace falta cuando ESTE entorno usa environment_provider =
+      # "azure"; el backend de estado (HCP Terraform) ya no depende de Azure para ningun
+      # entorno. OIDC, cuando aplica, NO esta acotado por entorno (bootstrap/azure-backend/oidc.tf);
       # la proteccion de production la aporta el gate de aprobacion de terraform-apply.yml.
+      - name: Leer environment_provider
+        id: provider
+        working-directory: environments
+        run: |
+          PROVIDER=$(grep -oP 'environment_provider\s*=\s*"\K[^"]+' ${{ matrix.environment }}/environment.tfvars)
+          echo "provider=${PROVIDER}" >> "$GITHUB_OUTPUT"
+
       - uses: azure/login@v2
+        if: steps.provider.outputs.provider == 'azure'
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: terraform init
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: environments
+        env:
+          TF_TOKEN_app_terraform_io: ${{ secrets.TFC_API_TOKEN }}
+          # El bloque "cloud" (environments/backend.tf) no admite -backend-config (confirmado
+          # 2026-11-11 contra un init real); se completa con estas variables (ADR 0007).
+          TF_CLOUD_ORGANIZATION: angel-java
+          TF_WORKSPACE: mailysoft-${{ matrix.environment }}
         run: terraform init -input=false
-
-      - name: terraform validate
-        working-directory: environments/${{ matrix.environment }}
-        run: terraform validate
-
-      - name: tflint
-        uses: terraform-linters/setup-tflint@v4
-        with:
-          tflint_version: latest
-      - run: tflint --chdir=environments/${{ matrix.environment }} --config="${{ github.workspace }}/.tflint.hcl"
-
-      - name: checkov
-        uses: bridgecrewio/checkov-action@master
-        with:
-          directory: environments/${{ matrix.environment }}
-          config_file: .checkov.yaml
-          quiet: true
 
       - name: terraform plan
         id: plan
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: environments
         env:
           # Secreto de REPOSITORIO con nombre por entorno (research.md seccion 2) — nunca de
           # GitHub Environment, para que este job de plan no quede bloqueado por el gate de
           # aprobacion de production (FR-008).
           RAILWAY_TOKEN: ${{ matrix.environment == 'dev' && secrets.RAILWAY_TOKEN_DEV || matrix.environment == 'staging' && secrets.RAILWAY_TOKEN_STAGING || secrets.RAILWAY_TOKEN_PRODUCTION }}
+          TF_TOKEN_app_terraform_io: ${{ secrets.TFC_API_TOKEN }}
+          # Confirmado 2026-11-11 contra un plan real: estas dos variables hacen falta en TODO
+          # comando de Terraform contra el bloque "cloud" vacio, no solo en "init" (ADR 0007).
+          TF_CLOUD_ORGANIZATION: angel-java
+          TF_WORKSPACE: mailysoft-${{ matrix.environment }}
         run: |
           terraform plan -input=false -no-color \
-            -var-file="environment.tfvars" \
-            -var-file="database.tfvars" \
-            -var-file="services.tfvars" \
+            -var-file="${{ matrix.environment }}/environment.tfvars" \
+            -var-file="${{ matrix.environment }}/database.tfvars" \
+            -var-file="${{ matrix.environment }}/services.tfvars" \
             -out=tfplan
           terraform show -no-color tfplan > plan.txt
           terraform show -json tfplan > plan.json
 
       - name: Detectar cambios destructivos (FR-010)
         id: destructive
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: environments
         run: |
           # Busca acciones delete/replace (delete+create) en el plan; nunca imprime valores
           # de variables, solo un booleano derivado de los metadatos de cambio (FR-010).
@@ -104,12 +146,12 @@ jobs:
 
       - name: Leer garantia de aislamiento y advertencia de mezcla de proveedores (FR-007/FR-014, 002-single-provider-deployment)
         id: isolation
-        working-directory: environments/${{ matrix.environment }}
+        working-directory: environments
         run: |
-          # isolation_guarantee: output raiz de environments/<entorno>/outputs.tf (FR-007).
+          # isolation_guarantee: output raiz de environments/outputs.tf (FR-007).
           GUARANTEE=$(jq -r '.planned_values.outputs.isolation_guarantee.value // "desconocida"' plan.json)
           echo "guarantee=${GUARANTEE}" >> "$GITHUB_OUTPUT"
-          # check "provider_consistency" (environments/<entorno>/main.tf): un check en estado
+          # check "provider_consistency" (environments/main.tf): un check en estado
           # "fail" es la advertencia de FR-014, no un error de validate/plan.
           HAS_PROVIDER_MIX=$(jq -r '[.checks[]? | select(.status == "fail")] | length > 0' plan.json)
           echo "has_provider_mix=${HAS_PROVIDER_MIX}" >> "$GITHUB_OUTPUT"
@@ -119,7 +161,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const planPath = `environments/${{ matrix.environment }}/plan.txt`;
+            const planPath = `environments/plan.txt`;
             let plan = fs.readFileSync(planPath, 'utf8');
             // El plan de Terraform ya redacta los valores marcados sensitive = true
             // (secret_refs, database_connection, connection_secret_value) — FR-011.

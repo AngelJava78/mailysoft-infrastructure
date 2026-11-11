@@ -13,6 +13,7 @@ resource "railway_service_domain" "generated" {
 
   service_id     = var.service_id
   environment_id = var.environment_id
+  subdomain      = var.subdomain
 }
 
 resource "railway_custom_domain" "this" {

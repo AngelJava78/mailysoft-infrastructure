@@ -68,6 +68,14 @@ permita").
 
 ## 3. Modelado de entornos y proyecto en Railway
 
+> **Corregido por [ADR 0006](../../docs/adr/0006-un-proyecto-railway-por-entorno.md)
+> (2026-11-11)**: la decisión de abajo (un único proyecto con tres Railway Environments) resultó
+> no dar aislamiento real entre entornos, confirmado contra un `apply` real — un `railway_service`
+> creado "para dev" queda visible y con el mismo nombre reservado en las demás pestañas del mismo
+> proyecto, porque el objeto pertenece al proyecto completo, no al Environment. El ADR 0006 adopta
+> en su lugar la alternativa que aquí se había rechazado: un proyecto de Railway distinto por
+> entorno. El resto de esta sección queda como registro histórico de la decisión original.
+
 **Decision**: Un único proyecto de Railway (`mailysoft`) con tres **Railway Environments** nativos
 (`dev`, `staging`, `production`), uno por cada entorno de la plataforma. Cada servicio de MailySoft
 se replica como un servicio independiente dentro de cada Railway Environment.

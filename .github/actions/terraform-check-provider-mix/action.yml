@@ -1,5 +1,5 @@
 name: "Terraform check provider mix (un entorno)"
-description: "Genera un plan de solo lectura y expone si FR-014 (002-single-provider-deployment) detecta mezcla de proveedores, para decidir si ese entorno necesita el gate manual de manual-review antes de aplicar."
+description: "Genera un plan de solo lectura y expone si FR-014 (002-single-provider-deployment) detecta mezcla de proveedores, para decidir si ese entorno necesita el gate manual de manual-review antes de aplicar. ADR 0007: environments/ es un root compartido, parametrizado por <environment>."
 
 inputs:
   environment:
@@ -13,6 +13,9 @@ inputs:
     required: true
   railway-token:
     required: true
+  tfc-token:
+    required: true
+    description: "Token de API de HCP Terraform (backend de estado; ADR 0004), secreto TFC_API_TOKEN."
   tf-version:
     required: true
 
@@ -28,33 +31,53 @@ runs:
       with:
         terraform_version: ${{ inputs.tf-version }}
 
+    # ADR 0004: azure/login solo hace falta cuando ESTE entorno usa environment_provider =
+    # "azure"; el backend de estado ya no depende de Azure para ningun entorno.
+    - name: Leer environment_provider
+      id: provider
+      working-directory: environments
+      shell: bash
+      run: |
+        PROVIDER=$(grep -oP 'environment_provider\s*=\s*"\K[^"]+' ${{ inputs.environment }}/environment.tfvars)
+        echo "provider=${PROVIDER}" >> "$GITHUB_OUTPUT"
+
     - uses: azure/login@v2
+      if: steps.provider.outputs.provider == 'azure'
       with:
         client-id: ${{ inputs.azure-client-id }}
         tenant-id: ${{ inputs.azure-tenant-id }}
         subscription-id: ${{ inputs.azure-subscription-id }}
 
     - name: terraform init
-      working-directory: environments/${{ inputs.environment }}
+      working-directory: environments
       shell: bash
+      env:
+        TF_TOKEN_app_terraform_io: ${{ inputs.tfc-token }}
+        # El bloque "cloud" (environments/backend.tf) no admite -backend-config (confirmado
+        # 2026-11-11 contra un init real); se completa con estas variables (ADR 0007).
+        TF_CLOUD_ORGANIZATION: angel-java
+        TF_WORKSPACE: mailysoft-${{ inputs.environment }}
       run: terraform init -input=false
 
     - name: terraform plan (solo lectura)
-      working-directory: environments/${{ inputs.environment }}
+      working-directory: environments
       shell: bash
       env:
         RAILWAY_TOKEN: ${{ inputs.railway-token }}
+        TF_TOKEN_app_terraform_io: ${{ inputs.tfc-token }}
+        TF_CLOUD_ORGANIZATION: angel-java
+        TF_WORKSPACE: mailysoft-${{ inputs.environment }}
       run: |
         terraform plan -input=false -no-color -lock=false \
-          -var-file="environment.tfvars" \
-          -var-file="database.tfvars" \
-          -var-file="services.tfvars" \
+          -var-file="${{ inputs.environment }}/environment.tfvars" \
+          -var-file="${{ inputs.environment }}/database.tfvars" \
+          -var-file="${{ inputs.environment }}/services.tfvars" \
           -out=check.tfplan
         terraform show -json check.tfplan > check.plan.json
 
     - name: Evaluar FR-010 / FR-014
       id: check
-      working-directory: environments/${{ inputs.environment }}
+      working-directory: environments
       shell: bash
       run: |
         HAS_DESTRUCTIVE=$(jq -r '[.resource_changes[]? | select(.change.actions | contains(["delete"]))] | length > 0' check.plan.json)

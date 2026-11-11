@@ -31,7 +31,7 @@ permissions:
   contents: read
 
 env:
-  TF_VERSION: "1.15.0"
+  TF_VERSION: "1.17.1"
   TF_IN_AUTOMATION: "true"
 
 jobs:
@@ -50,6 +50,7 @@ jobs:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           railway-token: ${{ secrets.RAILWAY_TOKEN_DEV }}
+          tfc-token: ${{ secrets.TFC_API_TOKEN }}
           tf-version: ${{ env.TF_VERSION }}
 
   manual-review-dev:
@@ -75,6 +76,7 @@ jobs:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           railway-token: ${{ secrets.RAILWAY_TOKEN_DEV }}
+          tfc-token: ${{ secrets.TFC_API_TOKEN }}
           tf-version: ${{ env.TF_VERSION }}
 
   check-staging:
@@ -93,6 +95,7 @@ jobs:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           railway-token: ${{ secrets.RAILWAY_TOKEN_STAGING }}
+          tfc-token: ${{ secrets.TFC_API_TOKEN }}
           tf-version: ${{ env.TF_VERSION }}
 
   manual-review-staging:
@@ -118,6 +121,7 @@ jobs:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           railway-token: ${{ secrets.RAILWAY_TOKEN_STAGING }}
+          tfc-token: ${{ secrets.TFC_API_TOKEN }}
           tf-version: ${{ env.TF_VERSION }}
 
   apply-production:
@@ -137,4 +141,5 @@ jobs:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           railway-token: ${{ secrets.RAILWAY_TOKEN_PRODUCTION }}
+          tfc-token: ${{ secrets.TFC_API_TOKEN }}
           tf-version: ${{ env.TF_VERSION }}

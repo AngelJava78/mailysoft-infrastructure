@@ -7,13 +7,21 @@
 # NO oficial. Verificar la version exacta y el esquema real de recursos en
 # registry.terraform.io/providers/terraform-community-providers/railway/latest antes del
 # primer apply; no se pudo confirmar contra el registro en el momento de escribir este modulo.
+# required_version confirmado 2026-11-09 contra la version real instalada (Terraform v1.17.1).
 terraform {
-  required_version = "~> 1.15.0"
+  required_version = "~> 1.17.0"
 
   required_providers {
     railway = {
       source  = "terraform-community-providers/railway"
       version = "0.6.2"
+    }
+    # Provider oficial de HashiCorp (hashicorp/time): unicamente para time_sleep, que impone la
+    # espera entre la creacion de cada railway_project exigida por el limite de tasa de Railway
+    # (ver main.tf). No gestiona ningun recurso de Railway.
+    time = {
+      source  = "hashicorp/time"
+      version = "~> 0.11"
     }
   }
 }

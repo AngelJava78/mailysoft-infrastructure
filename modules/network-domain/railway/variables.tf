@@ -3,6 +3,11 @@ variable "service_id" {
   description = "Id del railway_service al que se le configura la red."
 }
 
+variable "subdomain" {
+  type        = string
+  description = "Subdominio para el dominio autogenerado de Railway (resultado: https://<subdomain>.up.railway.app). Confirmado 2026-11-10 contra un plan real: railway_service_domain exige este atributo explicitamente, no lo deriva solo."
+}
+
 variable "environment_id" {
   type        = string
   description = "Id del Railway Environment al que pertenece el servicio."

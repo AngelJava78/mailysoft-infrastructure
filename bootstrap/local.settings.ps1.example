@@ -1,0 +1,34 @@
+# Plantilla para PowerShell: copiar a "local.settings.ps1" (NUNCA commitear esa copia; ya
+# esta en .gitignore) y rellenar los valores reales. Sirve para los dos bootstraps de una
+# sola vez (docs/runbooks/bootstrap.md) sin repetir "-var=..." en cada comando: Terraform lee
+# automaticamente cualquier variable de entorno TF_VAR_<nombre> declarada en el modulo.
+#
+# Uso, desde la raiz del repo:
+#   Copy-Item bootstrap/local.settings.ps1.example bootstrap/local.settings.ps1
+#   notepad bootstrap/local.settings.ps1   # rellenar los valores reales
+#   . .\bootstrap\local.settings.ps1       # "dot-source": carga las variables en la sesion actual
+#   cd bootstrap/azure-backend; terraform init; terraform plan -out=bootstrap.tfplan; terraform apply bootstrap.tfplan
+#   cd ../railway-project;      terraform init; terraform plan -out=bootstrap.tfplan; terraform apply bootstrap.tfplan
+#
+# Tras terminar AMBOS bootstraps: cerrar la sesion de PowerShell (o `Remove-Item Env:TF_VAR_*`)
+# para no dejar el Account Token de Railway ni las credenciales de Azure en el entorno mas
+# tiempo del necesario (principio de minimo privilegio).
+
+# ===== bootstrap/azure-backend (bootstrap/azure-backend/variables.tf) =====
+$env:TF_VAR_azure_subscription_id = "<subscription id de Azure>"
+$env:TF_VAR_azure_tenant_id       = "<tenant id de Microsoft Entra ID>"
+$env:TF_VAR_resource_group_name   = "<resource group donde vive mailysoft-db, o uno dedicado>"
+$env:TF_VAR_location               = "<region de Azure, ej. eastus>"
+$env:TF_VAR_storage_account_name   = "<nombre unico global, 3-24 caracteres en minusculas>"
+$env:TF_VAR_key_vault_name         = "<nombre del Key Vault>"
+$env:TF_VAR_github_repository      = "AngelJava78/mailysoft-infrastructure"
+
+# ===== bootstrap/railway-project (bootstrap/railway-project/variables.tf) =====
+# Account Token de Railway: Account Settings -> Tokens, con "No workspace" seleccionado.
+# De uso exclusivo y puntual para este bootstrap; revocarlo despues del apply.
+$env:TF_VAR_railway_account_token = "<Account Token de Railway>"
+
+# Obligatorio en la practica si el Account Token puede acceder a mas de un workspace
+# (confirmado 2026-11-09 contra un apply real). Obtenerlo desde el dashboard de Railway:
+# command palette (Ctrl/Cmd+K) sobre el workspace activo.
+$env:TF_VAR_workspace_id = "<workspace id de Railway>"

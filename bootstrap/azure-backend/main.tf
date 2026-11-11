@@ -13,8 +13,21 @@ resource "azurerm_storage_account" "tfstate" {
 
   min_tls_version = "TLS1_2"
 
+  # Esta cuenta aloja el estado de Terraform: nunca debe permitir acceso anonimo a blobs, ni
+  # siquiera a nivel de cuenta (el default del provider es "true" si no se declara).
+  allow_nested_items_to_be_public = false
+
   blob_properties {
     versioning_enabled = true
+
+    # Soft-delete: si se borra un blob de estado por error, queda recuperable 7 dias.
+    delete_retention_policy {
+      days = 7
+    }
+
+    container_delete_retention_policy {
+      days = 7
+    }
   }
 
   # Cifrado en reposo: habilitado por defecto en toda Storage Account de Azure con claves

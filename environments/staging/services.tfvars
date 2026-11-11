@@ -4,7 +4,7 @@
 services = [
   {
     name              = "mailysoft-usuarios-api-staging"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "usuarios-api"
     propietario_tag   = "equipo-plataforma"
@@ -15,7 +15,7 @@ services = [
   },
   {
     name              = "mailysoft-pacientes-api-staging"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "pacientes-api"
     propietario_tag   = "equipo-plataforma"
@@ -26,7 +26,7 @@ services = [
   },
   {
     name              = "mailysoft-sistema-api-staging"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "sistema-api"
     propietario_tag   = "equipo-plataforma"
@@ -37,7 +37,7 @@ services = [
   },
   {
     name              = "mailysoft-backoffice-staging"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "backoffice"
     propietario_tag   = "equipo-plataforma"
@@ -49,7 +49,7 @@ services = [
   {
     # 002-single-provider-deployment (FR-009): habilitada, mismo motivo que en dev.
     name              = "mailysoft-web-staging"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "web"
     propietario_tag   = "equipo-plataforma"
@@ -60,7 +60,7 @@ services = [
   },
   {
     name              = "mailysoft-clinicas-api-staging"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "clinicas-api"
     propietario_tag   = "equipo-plataforma"
@@ -70,7 +70,7 @@ services = [
   },
   {
     name              = "mailysoft-agenda-api-staging"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "agenda-api"
     propietario_tag   = "equipo-plataforma"
@@ -80,7 +80,7 @@ services = [
   },
   {
     name              = "mailysoft-publica-api-staging"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "publica-api"
     propietario_tag   = "equipo-plataforma"

@@ -47,5 +47,9 @@ opción que permite cumplir el Principio III sin tocar la consola de Railway man
   recursos/atributos del provider contra su documentación real (sin acceso a Terraform CLI
   ni al registro en ese momento). Cada uno de esos módulos señala explícitamente, en su
   propio código y README, qué verificar antes del primer `terraform init` real.
+  **Actualización 2026-11-09**: `bootstrap/railway-project` (`railway_project`,
+  `railway_environment`) quedó confirmado contra la documentación real del provider — ver
+  `docs/runbooks/bootstrap.md`. `modules/service/railway`, `modules/network-domain/railway` y
+  el riesgo adicional de `modules/database/railway-managed` (ADR 0003) siguen sin verificar.
 - **Revisar esta decisión** si Railway publica un provider oficial, o si el provider
   comunitario deja de mantenerse.

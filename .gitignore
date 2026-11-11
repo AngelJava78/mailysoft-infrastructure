@@ -24,6 +24,10 @@ secrets.auto.tfvars
 bootstrap/**/*.tfstate
 bootstrap/**/*.tfstate.backup
 
+# Variables (incluye el Account Token de Railway y credenciales de Azure) para los
+# bootstraps, en PowerShell: solo la plantilla "*.example" se commitea.
+bootstrap/local.settings.ps1
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf

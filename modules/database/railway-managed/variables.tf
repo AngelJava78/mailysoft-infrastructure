@@ -27,7 +27,7 @@ variable "postgres_image" {
 
 variable "volume_size_gb" {
   type        = number
-  description = "Tamano del volumen persistente adjunto al servicio."
+  description = "Tamano del volumen persistente adjunto al servicio. SIN CONECTAR todavia (main.tf, 2026-11-10): no se confirmo si el bloque \"volume\" de railway_service permite fijar el tamano via Terraform; revisar contra la salida real del siguiente plan/apply."
   default     = 10
 }
 

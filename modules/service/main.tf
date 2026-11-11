@@ -51,6 +51,12 @@ module "aws" {
   source = "./aws"
 
   name = var.name
+  # Confirmado 2026-11-10 contra un plan real: pasar "true" fijo aqui dispara la validacion
+  # de modules/service/aws/variables.tf aunque este modulo tenga count = 0 (Terraform evalua
+  # el valor literal que el bloque le pasa, independientemente del count). Condicionarlo a si
+  # este modulo realmente se esta usando hace que la validacion solo falle cuando alguien de
+  # verdad selecciona "aws" como provider_name.
+  fail_with_not_available_message = var.provider_name == "aws"
 }
 
 locals {

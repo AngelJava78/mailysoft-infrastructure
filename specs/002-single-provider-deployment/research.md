@@ -5,8 +5,10 @@
 Este documento resuelve las decisiones técnicas nuevas de la Fase 2. Las decisiones ya tomadas en
 la Fase 1 ([research.md de 001](../001-railway-deployment/research.md)) no se reabren aquí salvo
 que se diga explícitamente: provider de Railway (§1), autenticación de pipelines (§2), modelado de
-entornos en Railway (§3), tags sin soporte nativo (§5), estado remoto en `azurerm` (§6), versiones
-fijadas (§7), lint/seguridad (§8) y drift/rollback (§9) siguen vigentes sin cambios.
+entornos en Railway (§3), tags sin soporte nativo (§5), versiones
+fijadas (§7), lint/seguridad (§8) y drift/rollback (§9) siguen vigentes sin cambios. El estado
+remoto siempre en `azurerm` (§6) **sí se reabre** — ver sección 6 de este documento y
+[ADR 0004](../../docs/adr/0004-backend-estado-desacoplado-de-proveedor.md).
 
 ## 1. Cómputo de Azure para las ocho aplicaciones
 
@@ -145,3 +147,25 @@ resuelto como valor y entregado como variable de entorno que usa Railway, para n
 arquitecturas de secretos distintas en el mismo cambio. Cablear el acceso a Key Vault vía
 `azurerm_role_assignment` y la sintaxis de referencia `@Microsoft.KeyVault(...)` queda como
 trabajo de seguimiento explícito, no como parte de esta fase.
+
+## 6. (Revisión) Estado remoto de Terraform cuando el entorno elige Railway
+
+**Decision**: Se reabre research.md de 001 §6. El backend de estado deja de ser siempre
+`azurerm`: ahora sigue a `environment_provider`, igual que el resto de la infraestructura de
+cada entorno. Con `environment_provider = "railway"` (los tres entornos hoy), el backend es
+`cloud` de HCP Terraform (*free tier*, un workspace por entorno, Execution Mode = "Local"),
+autenticado con un único token de API (`TFC_API_TOKEN`). Con `environment_provider = "azure"`,
+se mantiene `azurerm` tal como describía 001 §6, vía `bootstrap/azure-backend` (que pasa a ser
+opcional, no un paso obligatorio del bootstrap inicial). Detalle completo, motivación y
+consecuencias en [ADR 0004](../../docs/adr/0004-backend-estado-desacoplado-de-proveedor.md).
+
+**Rationale**: 001 §6 asumía que `mailysoft-db` ya vivía en Azure, así que alojar ahí también
+el estado no sumaba una dependencia nueva. Ese supuesto no aplica a un entorno con
+`environment_provider = "railway"` desde que existe `modules/database/railway-managed`
+(sección 3 de este documento): hoy ese entorno no toca Azure para nada más. Mantener el
+backend fijo en `azurerm` para los tres entornos, descubierto en la práctica (2026-11-09),
+fuerza a cualquier operador a depender de una identidad de Microsoft Entra ID (potencialmente
+la de un empleador, no propia) solo para guardar un archivo de estado — justo el tipo de
+acoplamiento innecesario entre proveedores que FR-001 busca evitar.
+
+**Alternatives considered**: ver ADR 0004.

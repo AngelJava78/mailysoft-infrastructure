@@ -5,7 +5,7 @@
 services = [
   {
     name              = "mailysoft-usuarios-api-production"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "usuarios-api"
     propietario_tag   = "equipo-plataforma"
@@ -16,7 +16,7 @@ services = [
   },
   {
     name              = "mailysoft-pacientes-api-production"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "pacientes-api"
     propietario_tag   = "equipo-plataforma"
@@ -27,7 +27,7 @@ services = [
   },
   {
     name              = "mailysoft-sistema-api-production"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "sistema-api"
     propietario_tag   = "equipo-plataforma"
@@ -38,7 +38,7 @@ services = [
   },
   {
     name              = "mailysoft-backoffice-production"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "backoffice"
     propietario_tag   = "equipo-plataforma"
@@ -52,7 +52,7 @@ services = [
     # Pasa por la misma aprobacion manual obligatoria de production que cualquier otro
     # cambio en este archivo (FR-009 de 001-railway-deployment).
     name              = "mailysoft-web-production"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "web"
     propietario_tag   = "equipo-plataforma"
@@ -63,7 +63,7 @@ services = [
   },
   {
     name              = "mailysoft-clinicas-api-production"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "clinicas-api"
     propietario_tag   = "equipo-plataforma"
@@ -73,7 +73,7 @@ services = [
   },
   {
     name              = "mailysoft-agenda-api-production"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "agenda-api"
     propietario_tag   = "equipo-plataforma"
@@ -83,7 +83,7 @@ services = [
   },
   {
     name              = "mailysoft-publica-api-production"
-    enabled           = true
+    enabled           = false
     provider          = "railway"
     servicio_tag      = "publica-api"
     propietario_tag   = "equipo-plataforma"
