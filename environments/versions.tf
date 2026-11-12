@@ -7,7 +7,7 @@ terraform {
   required_providers {
     railway = {
       source  = "terraform-community-providers/railway"
-      version = "0.6.2"
+      version = "0.6.3" # probando si corrige el bug confirmado de volume.id/size en 0.6.2 (railway_service.postgres)
     }
     random = {
       source  = "hashicorp/random"
