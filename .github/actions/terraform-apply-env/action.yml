@@ -1,5 +1,5 @@
 name: "Terraform apply (un entorno)"
-description: "init -> apply para environments/ parametrizado por <environment>, usado por terraform-apply.yml (ADR 0007: root compartido)"
+description: "init -> apply para environments/ parametrizado por <environment>, usado por terraform-environment.yml (ADR 0007: root compartido; ADR 0009: workflow reutilizable). Aplica el plan que genero terraform-check-provider-mix en la misma invocacion (contracts/plan-artifact-handoff.md); nunca recalcula uno nuevo (FR-009/FR-010, ADR 0008)."
 
 inputs:
   environment:
@@ -25,6 +25,16 @@ runs:
     - uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: ${{ inputs.tf-version }}
+
+    # contracts/plan-artifact-handoff.md "Consumidor: job apply" -- descarga el plan EXACTO que
+    # genero terraform-check-provider-mix en la misma invocacion de terraform-environment.yml.
+    # Si el artefacto no existe (p. ej. el job check no corrio), este step falla y el job entero
+    # falla con el -- nunca se sigue adelante sin el (FR-009/FR-010).
+    - name: Descargar el plan generado por "check"
+      uses: actions/download-artifact@v4
+      with:
+        name: tfplan-${{ inputs.environment }}
+        path: environments
 
     # ADR 0004: azure/login solo hace falta cuando ESTE entorno usa environment_provider =
     # "azure" (modules/database/azure-existing y el provider azurerm real); el backend de
@@ -55,7 +65,7 @@ runs:
         TF_WORKSPACE: mailysoft-${{ inputs.environment }}
       run: terraform init -input=false
 
-    - name: terraform apply
+    - name: terraform apply (plan guardado -- FR-009, nunca -var-file/-auto-approve aqui)
       working-directory: environments
       shell: bash
       env:
@@ -64,7 +74,4 @@ runs:
         TF_CLOUD_ORGANIZATION: angel-java
         TF_WORKSPACE: mailysoft-${{ inputs.environment }}
       run: |
-        terraform apply -input=false -auto-approve -no-color \
-          -var-file="${{ inputs.environment }}/environment.tfvars" \
-          -var-file="${{ inputs.environment }}/database.tfvars" \
-          -var-file="${{ inputs.environment }}/services.tfvars"
+        terraform apply -input=false -no-color ${{ inputs.environment }}.tfplan

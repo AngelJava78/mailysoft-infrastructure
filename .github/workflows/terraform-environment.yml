@@ -1,0 +1,86 @@
+# Contrato: specs/003-reusable-pipeline-architecture/contracts/reusable-pipeline-interface.md
+# Workflow reutilizable (ADR 0009): concentra, una sola vez, el job graph de despliegue de UN
+# entorno -- check (plan de solo lectura + FR-010/FR-014) -> manual-review (condicional) ->
+# apply (con el plan que genero check, nunca uno recalculado -- FR-009/FR-010, ADR 0008). Lo
+# invocan los archivos delgados terraform-apply-<entorno>.yml; este workflow nunca se dispara
+# solo (no tiene "on: push", solo "on: workflow_call" -- FR-006/FR-007).
+
+name: Terraform Environment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "dev, staging o production (unico dato que distingue una invocacion de otra, FR-007)"
+        required: true
+        type: string
+      tf-version:
+        required: true
+        type: string
+    secrets:
+      azure-client-id:
+        required: true
+      azure-tenant-id:
+        required: true
+      azure-subscription-id:
+        required: true
+      railway-token:
+        required: true
+        description: "Token de Railway propio de ESTE entorno (p. ej. RAILWAY_TOKEN_DEV); nunca compartido entre entornos."
+      tfc-token:
+        required: true
+        description: "Token de API de HCP Terraform (ADR 0004), secreto TFC_API_TOKEN."
+
+permissions:
+  id-token: write # OIDC hacia Azure, solo tiene efecto si environment_provider = "azure"
+  contents: read
+
+jobs:
+  check:
+    name: Plan (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    outputs:
+      requires_review: ${{ steps.check.outputs.requires_review }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        uses: ./.github/actions/terraform-check-provider-mix
+        with:
+          environment: ${{ inputs.environment }}
+          azure-client-id: ${{ secrets.azure-client-id }}
+          azure-tenant-id: ${{ secrets.azure-tenant-id }}
+          azure-subscription-id: ${{ secrets.azure-subscription-id }}
+          railway-token: ${{ secrets.railway-token }}
+          tfc-token: ${{ secrets.tfc-token }}
+          tf-version: ${{ inputs.tf-version }}
+
+  manual-review:
+    name: Revision manual requerida (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    needs: check
+    if: needs.check.outputs.requires_review == 'true'
+    environment: manual-review # gate nativo de GitHub (FR-011); condicion, no el entorno en si
+    steps:
+      - run: echo "Cambio destructivo o mezcla de proveedores detectada en ${{ inputs.environment }} (FR-010/FR-014); aprobado."
+
+  apply:
+    name: Apply (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    needs: [check, manual-review]
+    if: always() && needs.check.result == 'success' && (needs.manual-review.result == 'success' || needs.manual-review.result == 'skipped')
+    # FR-011: nombrar aqui el GitHub Environment de ESTE entorno es lo que hace que "production"
+    # exija su aprobacion nativa ya configurada (T034 de 001-railway-deployment) sin ninguna
+    # condicion nueva en este workflow. "dev"/"staging" no tienen reglas de proteccion
+    # configuradas -> el job pasa de inmediato, igual que hoy (research.md seccion 2).
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/terraform-apply-env
+        with:
+          environment: ${{ inputs.environment }}
+          azure-client-id: ${{ secrets.azure-client-id }}
+          azure-tenant-id: ${{ secrets.azure-tenant-id }}
+          azure-subscription-id: ${{ secrets.azure-subscription-id }}
+          railway-token: ${{ secrets.railway-token }}
+          tfc-token: ${{ secrets.tfc-token }}
+          tf-version: ${{ inputs.tf-version }}

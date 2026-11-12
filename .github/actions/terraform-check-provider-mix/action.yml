@@ -1,10 +1,10 @@
 name: "Terraform check provider mix (un entorno)"
-description: "Genera un plan de solo lectura y expone si FR-014 (002-single-provider-deployment) detecta mezcla de proveedores, para decidir si ese entorno necesita el gate manual de manual-review antes de aplicar. ADR 0007: environments/ es un root compartido, parametrizado por <environment>."
+description: "Genera el plan de este entorno (una sola vez; lo reutiliza intacto el job apply, nunca lo recalcula -- FR-009/FR-010, ADR 0008) y expone si FR-014 (002-single-provider-deployment) detecta mezcla de proveedores, para decidir si ese entorno necesita el gate manual de manual-review antes de aplicar. ADR 0007: environments/ es un root compartido, parametrizado por <environment>. Se usa para los tres entornos por igual, incluido production (antes de ADR 0009, production aplicaba sin generar ningun plan previo)."
 
 inputs:
   environment:
     required: true
-    description: "dev o staging (production ya exige aprobacion manual para todo cambio, FR-009)"
+    description: "dev, staging o production"
   azure-client-id:
     required: true
   azure-tenant-id:
@@ -72,18 +72,27 @@ runs:
           -var-file="${{ inputs.environment }}/environment.tfvars" \
           -var-file="${{ inputs.environment }}/database.tfvars" \
           -var-file="${{ inputs.environment }}/services.tfvars" \
-          -out=check.tfplan
-        terraform show -json check.tfplan > check.plan.json
+          -out=${{ inputs.environment }}.tfplan
+        terraform show -json ${{ inputs.environment }}.tfplan > ${{ inputs.environment }}.plan.json
 
     - name: Evaluar FR-010 / FR-014
       id: check
       working-directory: environments
       shell: bash
       run: |
-        HAS_DESTRUCTIVE=$(jq -r '[.resource_changes[]? | select(.change.actions | contains(["delete"]))] | length > 0' check.plan.json)
-        HAS_PROVIDER_MIX=$(jq -r '[.checks[]? | select(.status == "fail")] | length > 0' check.plan.json)
+        HAS_DESTRUCTIVE=$(jq -r '[.resource_changes[]? | select(.change.actions | contains(["delete"]))] | length > 0' ${{ inputs.environment }}.plan.json)
+        HAS_PROVIDER_MIX=$(jq -r '[.checks[]? | select(.status == "fail")] | length > 0' ${{ inputs.environment }}.plan.json)
         if [ "$HAS_DESTRUCTIVE" = "true" ] || [ "$HAS_PROVIDER_MIX" = "true" ]; then
           echo "requires_review=true" >> "$GITHUB_OUTPUT"
         else
           echo "requires_review=false" >> "$GITHUB_OUTPUT"
         fi
+
+    # contracts/plan-artifact-handoff.md "Productor: job check" -- este es EL plan que el job
+    # apply de esta misma invocacion debe aplicar (FR-009); nunca se recalcula en apply.
+    - name: Publicar el plan como artefacto (FR-009/FR-010)
+      uses: actions/upload-artifact@v4
+      with:
+        name: tfplan-${{ inputs.environment }}
+        path: environments/${{ inputs.environment }}.tfplan
+        retention-days: 1

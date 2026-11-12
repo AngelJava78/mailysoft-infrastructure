@@ -71,9 +71,15 @@ Terraform compartido — añadir un entorno nunca copia código, solo datos:
    `$env:TF_WORKSPACE = "mailysoft-<nuevo-entorno>"`, no con un archivo).
 2. Añadir `<nuevo-entorno>` a la validación de `environment_name` en `environments/variables.tf`
    y a la matriz (`matrix.environment`) de `terraform-pr.yml`/`terraform-drift.yml`.
-3. Si el entorno necesita un gate de aprobación (como `production`), crear el GitHub
-   Environment correspondiente con sus reglas de protección, y añadir un job más en
-   `.github/workflows/terraform-apply.yml` que lo declare.
+3. Crear `.github/workflows/terraform-apply-<nuevo-entorno>.yml`: un archivo delgado que solo
+   invoca el workflow reutilizable `terraform-environment.yml` con `environment:
+   <nuevo-entorno>` y sus propios secretos (ver
+   [specs/003-reusable-pipeline-architecture/contracts/reusable-pipeline-interface.md](specs/003-reusable-pipeline-architecture/contracts/reusable-pipeline-interface.md)
+   — **ADR [0009](docs/adr/0009-workflow-reutilizable-por-entorno.md)**: ningún entorno nuevo
+   agrega lógica de pipeline, solo esta configuración). Si el entorno necesita un gate de
+   aprobación (como `production`), crear el GitHub Environment correspondiente con sus reglas de
+   protección — `terraform-environment.yml` ya lo activa automáticamente para cualquier entorno
+   cuyo nombre tenga reglas configuradas, sin tocar su código.
 
 ## Elegir Railway o Azure para un entorno
 
@@ -98,6 +104,13 @@ Azure.
 
 Ver [specs/002-single-provider-deployment/spec.md](specs/002-single-provider-deployment/spec.md)
 para el diseño original de FR-001, y el ADR 0005 para la corrección.
+
+**Regla obligatoria para cuando se construya ese root** (ADR 0005 +
+[especificación 003](specs/003-reusable-pipeline-architecture/spec.md) FR-004): sus recursos MUST
+declararse una sola vez, variando por entorno mediante `.tfvars` — exactamente el patrón que ya
+usa `environments/` desde el ADR 0007. El root de Azure MUST nacer así desde su primera versión;
+no puede repetirse el error original de `environments/` (una copia de código por entorno) y
+corregirlo después.
 
 ## Añadir un proveedor nuevo (AWS, Fase 3)
 

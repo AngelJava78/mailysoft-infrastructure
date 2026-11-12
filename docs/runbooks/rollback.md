@@ -21,11 +21,13 @@ Terraform a mano ni se aplica nada fuera del pipeline.
    Si el cambio problemático abarca varios commits, usar
    `git revert <mas-antiguo>^..<mas-reciente>`.
 
-3. **Dejar que el pipeline haga el resto**: el push a `main` dispara `terraform-apply.yml`
-   igual que cualquier otro cambio:
+3. **Dejar que el pipeline haga el resto**: el push a `main` dispara, para cada entorno cuya
+   configuración cambió, su propio `terraform-apply-<entorno>.yml` (ADR 0009) — que a su vez
+   invoca `terraform-environment.yml` — igual que cualquier otro cambio:
    - `dev` y `staging` aplican automáticamente.
    - `production` se detiene en el gate de aprobación manual (FR-009) — un responsable
-     técnico debe revisar la previsualización (que ahora muestra que se está volviendo al
+     técnico debe abrir el job `check` de ese mismo run (ahora siempre genera un plan previo,
+     ADR 0008) para revisar la previsualización (que ahora muestra que se está volviendo al
      estado anterior) y aprobarla explícitamente, igual que cualquier otro cambio.
 
 4. **Si el revert no es posible** (por ejemplo, porque el cambio problemático ya fue

@@ -92,3 +92,9 @@ Fase 2 para Azure, listo para cuando exista un root que realmente lo necesite.
   `environments/<entorno>/main.tf` consume (antes era `modules/service`, el despachador,
   quien la consumía). `modules/service/README.md` sigue describiendo el despachador para
   cuando un root multi-proveedor lo necesite.
+- **Nota añadida (2026-11-12,
+  [especificación 003](../../specs/003-reusable-pipeline-architecture/spec.md), FR-004)**: cuando
+  se construya ese root de Azure, MUST seguir desde su primera versión el mismo patrón de una
+  sola declaración de recursos por proveedor, variable por entorno mediante `.tfvars`, que el ADR
+  0007 ya impuso para Railway — no partir de una copia de archivos por entorno y corregirlo
+  después, como ocurrió originalmente con Railway.

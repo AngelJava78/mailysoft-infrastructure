@@ -1,0 +1,39 @@
+# Archivo delgado (FR-007/FR-012): solo dispara y configura. Toda la logica de despliegue vive
+# en terraform-environment.yml (contrato: specs/003-reusable-pipeline-architecture/contracts/
+# reusable-pipeline-interface.md). No depende ("needs") de ningun otro entorno (FR-008) --
+# sustituye al job "apply-production" que antes vivia encadenado en terraform-apply.yml.
+# La aprobacion manual de production (FR-009 de 001-railway-deployment) la sigue dando el
+# GitHub Environment "production" ya configurado (T034); terraform-environment.yml la activa
+# declarando "environment: ${{ inputs.environment }}" en su job apply, sin condicion nueva aqui.
+
+name: Terraform Apply (production)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "environments/production/**"
+      - "environments/*.tf"
+      - "modules/**"
+      - "bootstrap/**"
+      - ".github/workflows/terraform-apply-production.yml"
+      - ".github/workflows/terraform-environment.yml"
+      - ".github/actions/terraform-check-provider-mix/**"
+      - ".github/actions/terraform-apply-env/**"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/terraform-environment.yml
+    with:
+      environment: production
+      tf-version: "1.17.1"
+    secrets:
+      azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      azure-subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      railway-token: ${{ secrets.RAILWAY_TOKEN_PRODUCTION }}
+      tfc-token: ${{ secrets.TFC_API_TOKEN }}

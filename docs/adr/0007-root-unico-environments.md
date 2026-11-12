@@ -95,3 +95,15 @@ automatically activates any new Cloud configuration settings"*).
   pasa a ser crear una subcarpeta con sus tres `.tfvars` y su `backend.hcl` únicamente.
 - El lockfile de providers (`.terraform.lock.hcl`) pasa a vivir una sola vez en
   `environments/.terraform.lock.hcl` (antes uno por entorno, idénticos).
+
+**Nota añadida (2026-11-12, [especificación 003](../../specs/003-reusable-pipeline-architecture/spec.md))**:
+
+- FR-004 extiende esta misma regla (una sola declaración de recursos, variable por entorno) como
+  obligación permanente para cualquier root de Terraform futuro, no solo para Railway — en
+  particular, para el root de Azure que se construya en una fase posterior (ver también la nota
+  equivalente en [ADR 0005](0005-separar-roots-por-proveedor.md)).
+- `terraform-apply.yml`, mencionado arriba, fue sustituido por un workflow reutilizable
+  (`terraform-environment.yml`) más un archivo delgado por entorno — ver
+  [ADR 0009](0009-workflow-reutilizable-por-entorno.md). El mismo principio de "una sola
+  declaración, variable por configuración" que este ADR impuso para Terraform se extendió ahí a
+  los pipelines de CI/CD.
